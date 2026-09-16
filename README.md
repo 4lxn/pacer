@@ -1,11 +1,17 @@
 # Autopiloto
 
-Single-user iOS day runner: a fixed list of daily blocks, a local notification when each fixed
-block starts, one-tap Done. Swift 6, SwiftUI, iOS 17+, no third-party dependencies.
+Your day on rails. An iOS planner of daily blocks that notifies you when each fixed block starts,
+takes Done / Snooze from the lock screen, closes training blocks from Apple Health, and bundles the
+trackers around your day: training week and weight, meals and pantry, study timer, income, closet
+with laundry and outfits, and an AI Coach that knows your plan. Swift 6, SwiftUI, iOS 17+, no
+third-party dependencies.
 
-The only network code lives in `Sources/Coach/`: an optional "Coach" sheet that sends today's
-status plus a bundled training/diet context to the Claude Messages API. Everything else works
-with no network, ever.
+Tabs: **Today** (plan + editor) · **Train** (Apple Health) · **Food** · **Life** (study, income,
+closet) · **Coach**.
+
+The only network code lives in `Sources/Coach/` (Claude Messages API, directly with the user's key
+or through `server/`). Everything else works with no network, ever. Docs: `docs/privacy.md`,
+`docs/app-store.md`, `docs/release.md`, `server/README.md`.
 
 ## Requirements
 
@@ -45,13 +51,16 @@ Debug builds have an "Add test run" button to exercise the pipeline in the simul
 
 ## Changing the plan
 
-There is no editing UI. Edit the `Plan.blocks` array in `Sources/Models/Plan.swift` and rebuild.
+Today → the sliders button opens the Plan editor (add, edit, delete blocks; weekdays; anchor;
+auto-complete). `Sources/Models/Plan.swift` only holds the seeds: the original day for installs
+that predate the editor, and `Plan.starter(wake:sleep:)` for onboarding.
 
 ## Coach (optional)
 
-Tap **Coach** on the main screen, paste an Anthropic API key once (stored in the Keychain, never in
-this repo), and ask a question. The system prompt is `Sources/Coach/CoachContext.swift` plus a
-snapshot of today's blocks.
+Coach tab → either subscribe (Sign in with Apple, needs `server/` deployed and
+`CoachClient.proxyURL` set) or Menu → "Use my own API key" and paste an Anthropic key (Keychain,
+never in this repo). The system prompt is the editable **Coach profile** (Menu → Coach profile)
+plus a snapshot of today's blocks, training, food, study and closet.
 
 ## Verify no network code outside Coach
 
