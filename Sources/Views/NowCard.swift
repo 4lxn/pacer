@@ -38,7 +38,7 @@ struct NowCard: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.glassProminent)
                 .tint(status == .missed ? .red : .accentColor)
             } else if allDone {
                 Text("All done for today").font(.largeTitle.weight(.bold))

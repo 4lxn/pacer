@@ -77,6 +77,12 @@ final class TrackStore {
         return session
     }
 
+    /// A session logged after the fact (e.g. "I studied 45 min this morning").
+    func addSession(start: Date, minutes: Int, topic: String) {
+        sessions.append(StudySession(start: start, end: start.addingTimeInterval(Double(max(1, minutes)) * 60), topic: topic.isEmpty ? "Study" : topic))
+        save()
+    }
+
     func deleteSession(id: String) {
         sessions.removeAll { $0.id == id }
         save()

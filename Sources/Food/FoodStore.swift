@@ -102,6 +102,15 @@ final class FoodStore {
         save()
     }
 
+    func addPreset(name: String, kcal: Int, proteinGrams: Int) {
+        if let i = presets.firstIndex(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
+            presets[i].kcal = kcal; presets[i].proteinGrams = proteinGrams
+        } else {
+            presets.append(MealPreset(name: name, kcal: kcal, proteinGrams: proteinGrams))
+        }
+        save()
+    }
+
     func deletePreset(id: String) {
         presets.removeAll { $0.id == id }
         save()

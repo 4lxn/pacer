@@ -3,7 +3,7 @@
 Your day on rails. An iOS planner of daily blocks that notifies you when each fixed block starts,
 takes Done / Snooze from the lock screen, closes training blocks from Apple Health, and bundles the
 trackers around your day: training week and weight, meals and pantry, study timer, income, closet
-with laundry and outfits, and an AI Coach that knows your plan. Swift 6, SwiftUI, iOS 17+, no
+with laundry and outfits, and an AI Coach that knows your plan. Swift 6, SwiftUI, iOS 26+ (Liquid Glass), no
 third-party dependencies.
 
 Tabs: **Today** (plan + editor) · **Train** (Apple Health) · **Food** · **Life** (study, income,

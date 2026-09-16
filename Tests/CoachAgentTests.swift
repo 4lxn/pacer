@@ -115,6 +115,66 @@ final class CoachAgentTests: XCTestCase {
         XCTAssertTrue(tools.run(name: "nope", input: [:]).isError)
     }
 
+    func testCrudToolsCoverEveryStore() throws {
+        let tools = try makeTools()
+        // Pantry delete
+        XCTAssertEqual(tools.run(name: "delete_pantry_item", input: ["name": "prunes"]).summary, "Pantry: removed Prunes")
+        XCTAssertNil(tools.food.pantry.first { $0.name == "Prunes" })
+        // Meals + presets + targets
+        _ = tools.run(name: "log_meal", input: ["name": "Yogurt", "kcal": 200, "protein_grams": 15])
+        let mealID = tools.food.meals(on: tools.now()).first!.id
+        XCTAssertTrue(tools.run(name: "get_meals_today", input: [:]).output.contains(mealID))
+        XCTAssertEqual(tools.run(name: "delete_meal", input: ["id": mealID]).summary, "Removed meal Yogurt")
+        XCTAssertEqual(tools.run(name: "set_targets", input: ["kcal": 2100]).summary, "Targets → 2100 kcal / 160 g")
+        _ = tools.run(name: "add_preset", input: ["name": "Oats", "kcal": 300, "protein_grams": 10])
+        XCTAssertTrue(tools.food.presets.contains { $0.name == "Oats" })
+        _ = tools.run(name: "delete_preset", input: ["name": "oats"])
+        XCTAssertFalse(tools.food.presets.contains { $0.name == "Oats" })
+        // Closet update / wash / context / delete
+        _ = tools.run(name: "add_garment", input: ["name": "grey tee", "category": "top", "color": "grey", "wash_after": 2])
+        XCTAssertEqual(tools.run(name: "update_garment", input: ["name": "grey tee", "new_name": "grey v-neck", "warmth": 9]).summary, "Closet: updated grey v-neck")
+        XCTAssertEqual(tools.wardrobe.closet.first?.warmth, 3)
+        _ = tools.run(name: "wear_outfit", input: ["names": ["grey v-neck"]])
+        _ = tools.run(name: "wear_outfit", input: ["names": ["grey v-neck"]])   // same day: still 1 wear
+        XCTAssertEqual(tools.wardrobe.closet.first?.wearsSinceWash, 1)
+        XCTAssertEqual(tools.run(name: "mark_washed", input: ["names": ["grey v-neck"]]).summary, "Washed grey v-neck")
+        XCTAssertEqual(tools.run(name: "set_closet_context", input: ["weather": "cold", "style": "smart"]).summary, "Outfit context: cold, smart")
+        XCTAssertTrue(tools.run(name: "get_closet", input: [:]).output.hasPrefix("Weather cold, style smart"))
+        _ = tools.run(name: "delete_garment", input: ["name": "grey v-neck"])
+        XCTAssertTrue(tools.wardrobe.closet.isEmpty)
+        // Study + income
+        XCTAssertEqual(tools.run(name: "add_study_session", input: ["minutes": 45, "topic": "Swift", "start": "10:00"]).summary, "Study +45 min")
+        XCTAssertEqual(tools.track.studyMinutes(on: tools.now()), 45)
+        let sessionID = tools.track.sessions[0].id
+        XCTAssertTrue(tools.run(name: "get_study", input: [:]).output.contains(sessionID))
+        _ = tools.run(name: "delete_study_session", input: ["id": sessionID])
+        XCTAssertTrue(tools.track.sessions.isEmpty)
+        _ = tools.run(name: "set_study_goal", input: ["minutes": 600])
+        XCTAssertEqual(tools.track.weeklyStudyGoalMinutes, 600)
+        _ = tools.run(name: "add_income", input: ["source": "Salary", "amount": 1000, "date": "2026-09-01"])
+        XCTAssertEqual(tools.track.incomeTotal(monthOf: tools.now()), 1000)
+        let incomeID = tools.track.income[0].id
+        XCTAssertTrue(tools.run(name: "get_income", input: [:]).output.contains(incomeID))
+        _ = tools.run(name: "delete_income", input: ["id": incomeID])
+        XCTAssertTrue(tools.track.income.isEmpty)
+        // Definitions and executor agree on names
+        let names = CoachTools.definitions.compactMap { $0["name"] as? String }
+        XCTAssertEqual(names.count, Set(names).count)
+        for name in names {
+            XCTAssertNotEqual(tools.run(name: name, input: [:]).output, "Unknown tool \(name)", name)
+        }
+    }
+
+    func testForgetRemovesMemoryLines() {
+        let defaults = UserDefaults(suiteName: "mem-\(UUID().uuidString)")!
+        CoachProfile.save("## Goals\nlose fat", defaults: defaults)
+        CoachProfile.appendMemory("hates broccoli", defaults: defaults)
+        CoachProfile.appendMemory("likes prunes", defaults: defaults)
+        XCTAssertEqual(CoachProfile.forget("Broccoli", defaults: defaults), 1)
+        XCTAssertEqual(CoachProfile.load(defaults: defaults), "## Goals\nlose fat\n\n## Memory\n- likes prunes")
+        XCTAssertEqual(CoachProfile.forget("nothing", defaults: defaults), 0)
+    }
+
     func testAgentLoopRunsToolsThenAnswers() async throws {
         let tools = try makeTools()
         let chat = CoachChatStore(fileURL: dir.appendingPathComponent("chat.json"))
