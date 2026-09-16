@@ -23,6 +23,7 @@ struct RootView: View {
             CoachView(store: store, plan: plan, health: health, food: food, track: track, account: account, wardrobe: wardrobe, agent: agent)
                 .tabItem { Label("Coach", systemImage: "bubble.left.and.text.bubble.right") }
         }
+        .tabBarMinimizeBehavior(.onScrollDown)
         .fullScreenCover(isPresented: Binding(get: { plan.needsOnboarding }, set: { _ in })) {
             OnboardingView { plan.replace(with: $0) }
         }

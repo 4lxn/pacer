@@ -17,7 +17,9 @@ struct CoachView: View {
     @State private var keyDraft = ""
     @State private var editingProfile = false
     @State private var draft = ""
+    @State private var confirmClear = false
     @FocusState private var inputFocused: Bool
+    @Namespace private var glass
 
     private let calendar = Calendar.current
     private let suggestions = ["¿Qué toca ahora?", "¿Qué ceno hoy?", "¿Qué compro?", "Agrega 1 kg de arroz", "Mueve estudio a las 5 pm", "¿Qué me pongo?"]
@@ -43,7 +45,7 @@ struct CoachView: View {
             .toolbar {
                 Menu {
                     Button("Coach profile", systemImage: "person.text.rectangle") { editingProfile = true }
-                    Button("Clear chat", systemImage: "trash") { agent.chat.clear() }
+                    Button("Clear chat", systemImage: "trash", role: .destructive) { confirmClear = true }
                     if CoachClient.proxyURL != nil {
                         Toggle("Use my own API key", isOn: $useOwnKey)
                     }
@@ -60,6 +62,11 @@ struct CoachView: View {
             }
             .sheet(isPresented: $editingProfile) { ProfileEditor() }
             .sheet(isPresented: $editingKey) { keySheet }
+            .confirmationDialog("Clear the conversation?", isPresented: $confirmClear, titleVisibility: .visible) {
+                Button("Clear chat", role: .destructive) { agent.chat.clear() }
+            } message: {
+                Text("The coach forgets this chat. Your profile and Memory stay.")
+            }
             .task { if CoachClient.proxyURL != nil { await account.loadProduct() } }
         }
     }
@@ -67,54 +74,78 @@ struct CoachView: View {
     // MARK: - Chat
 
     private var chat: some View {
-        VStack(spacing: 0) {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 10) {
-                        if agent.chat.entries.isEmpty { emptyState }
-                        ForEach(agent.chat.entries) { entry in bubble(entry).id(entry.id) }
-                        if agent.isBusy {
-                            HStack(spacing: 8) { ProgressView(); Text("Thinking…").foregroundStyle(.secondary) }
-                                .padding(.horizontal, 4).id("busy")
-                        }
-                        if let error = agent.lastError {
-                            Text(error).font(.footnote).foregroundStyle(.red).padding(.horizontal, 4)
-                        }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    if agent.chat.entries.isEmpty { emptyState }
+                    ForEach(agent.chat.entries) { entry in bubble(entry).id(entry.id) }
+                    if agent.isBusy {
+                        HStack(spacing: 8) { ProgressView(); Text("Thinking…").foregroundStyle(.secondary) }
+                            .padding(.horizontal, 4).id("busy")
                     }
-                    .padding()
+                    if let error = agent.lastError {
+                        Text(error).font(.footnote).foregroundStyle(.red).padding(.horizontal, 4)
+                    }
+                    Color.clear.frame(height: 72).id("bottom")   // room for the floating input bar
                 }
-                .onChange(of: agent.chat.entries.count) { _, _ in
-                    withAnimation { proxy.scrollTo(agent.chat.entries.last?.id, anchor: .bottom) }
-                }
-                .onChange(of: agent.isBusy) { _, busy in
-                    if busy { withAnimation { proxy.scrollTo("busy", anchor: .bottom) } }
-                }
+                .padding()
             }
-            Divider()
-            HStack(alignment: .bottom, spacing: 8) {
-                TextField("Ask or tell the coach…", text: $draft, axis: .vertical)
-                    .lineLimit(1...5)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($inputFocused)
-                    .submitLabel(.send)
-                    .onSubmit { send() }
-                Button { send() } label: { Image(systemName: "arrow.up.circle.fill").font(.title) }
-                    .disabled(agent.isBusy || draft.trimmingCharacters(in: .whitespaces).isEmpty)
-                    .accessibilityLabel("Send")
+            .scrollDismissesKeyboard(.interactively)
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
+            .onTapGesture { inputFocused = false }
+            .onChange(of: agent.chat.entries.count) { _, _ in
+                withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
             }
-            .padding(10)
-            .background(.bar)
+            .onChange(of: agent.isBusy) { _, busy in
+                if busy { withAnimation { proxy.scrollTo("bottom", anchor: .bottom) } }
+            }
+            .safeAreaInset(edge: .bottom) { inputBar }
         }
     }
 
+    /// Floating Liquid Glass input bar; the keyboard's Done button and a tap on the chat dismiss it.
+    private var inputBar: some View {
+        GlassEffectContainer(spacing: 10) {
+            HStack(alignment: .bottom, spacing: 10) {
+                TextField("Ask or tell the coach…", text: $draft, axis: .vertical)
+                    .lineLimit(1...5)
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 22))
+                    .glassEffectID("input", in: glass)
+                    .focused($inputFocused)
+                    .submitLabel(.send)
+                    .onSubmit { send() }
+                    .toolbar {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button("Done") { inputFocused = false }
+                        }
+                    }
+                Button { send() } label: {
+                    Image(systemName: agent.isBusy ? "hourglass" : "arrow.up")
+                        .font(.body.weight(.semibold))
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.glassProminent)
+                .clipShape(Circle())
+                .disabled(agent.isBusy || draft.trimmingCharacters(in: .whitespaces).isEmpty)
+                .accessibilityLabel("Send")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 6)
+    }
+
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Your coach knows today's plan, your training, food, study and closet — and can change them.")
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Your coach knows today's plan, your training, food, study and closet — and can add, change or delete any of it.")
                 .foregroundStyle(.secondary)
-            FlowLayout(spacing: 8) {
-                ForEach(suggestions, id: \.self) { s in
-                    Button(s) { draft = s; send() }
-                        .buttonStyle(.bordered).controlSize(.small)
+            GlassEffectContainer(spacing: 8) {
+                FlowLayout(spacing: 8) {
+                    ForEach(suggestions, id: \.self) { s in
+                        Button(s) { draft = s; send() }
+                            .buttonStyle(.glass).controlSize(.small)
+                    }
                 }
             }
         }
@@ -126,18 +157,18 @@ struct CoachView: View {
         switch entry.role {
         case .user:
             HStack { Spacer(minLength: 60)
-                Text(entry.text).padding(10)
-                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14)).foregroundStyle(.white)
+                Text(entry.text).padding(12)
+                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 18)).foregroundStyle(.white)
             }
         case .assistant:
-            HStack { Text(entry.text).padding(10).textSelection(.enabled)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14))
+            HStack { Text(entry.text).padding(12).textSelection(.enabled)
+                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
                 Spacer(minLength: 40) }
         case .tool:
             Label(entry.text, systemImage: "checkmark.circle.fill")
-                .font(.caption).foregroundStyle(.secondary)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(Color(uiColor: .tertiarySystemFill), in: Capsule())
+                .font(.caption.weight(.medium))
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .glassEffect(.regular.tint(.green.opacity(0.35)), in: .capsule)
         }
     }
 

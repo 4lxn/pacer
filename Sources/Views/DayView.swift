@@ -75,9 +75,9 @@ struct DayView: View {
             Button {
                 editingPlan = true
             } label: {
-                Image(systemName: "slider.horizontal.3")
+                Image(systemName: "slider.horizontal.3").frame(width: 24, height: 24)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.glass)
             .accessibilityLabel("Edit plan")
         }
     }
@@ -95,7 +95,7 @@ struct DayView: View {
                         UIApplication.shared.open(url)
                     }
                 }
-                .font(.subheadline.weight(.semibold))
+                .buttonStyle(.glass).controlSize(.small)
             }
             Spacer()
             Button {

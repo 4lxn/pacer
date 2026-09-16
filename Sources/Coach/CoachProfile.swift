@@ -36,6 +36,22 @@ enum CoachProfile {
         defaults.set(text, forKey: key)
     }
 
+    /// Removes Memory lines containing `text` (case-insensitive). Returns how many were removed.
+    @discardableResult
+    static func forget(_ text: String, defaults: UserDefaults = .standard) -> Int {
+        let lines = load(defaults: defaults).components(separatedBy: "\n")
+        let needle = text.lowercased()
+        var inMemory = false
+        var removed = 0
+        let kept = lines.filter { line in
+            if line.hasPrefix("## ") { inMemory = line.hasPrefix("## Memory") }
+            if inMemory, line.hasPrefix("- "), line.lowercased().contains(needle) { removed += 1; return false }
+            return true
+        }
+        if removed > 0 { save(kept.joined(separator: "\n"), defaults: defaults) }
+        return removed
+    }
+
     /// Appends a line under a `## Memory` section (created on first use). The agent's `remember` tool.
     static func appendMemory(_ note: String, defaults: UserDefaults = .standard) {
         var text = load(defaults: defaults)

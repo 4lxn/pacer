@@ -19,7 +19,7 @@ struct OnboardingView: View {
                 DatePicker("I wake up at", selection: $wake, displayedComponents: .hourAndMinute)
                 DatePicker("I go to sleep at", selection: $sleep, displayedComponents: .hourAndMinute)
                 Button("Build my day") { step = 1 }
-                    .buttonStyle(.borderedProminent).controlSize(.large).frame(maxWidth: .infinity)
+                    .buttonStyle(.glassProminent).controlSize(.large).frame(maxWidth: .infinity)
             } else {
                 Text("Let it tap you on the shoulder").font(.largeTitle.weight(.bold))
                 Text("Each fixed block sends a notification when it starts. Done and Snooze work from the lock screen.")
@@ -30,8 +30,8 @@ struct OnboardingView: View {
                         finish()
                     }
                 }
-                .buttonStyle(.borderedProminent).controlSize(.large).frame(maxWidth: .infinity)
-                Button("Not now") { finish() }.frame(maxWidth: .infinity)
+                .buttonStyle(.glassProminent).controlSize(.large).frame(maxWidth: .infinity)
+                Button("Not now") { finish() }.buttonStyle(.glass).frame(maxWidth: .infinity)
             }
             Spacer()
         }

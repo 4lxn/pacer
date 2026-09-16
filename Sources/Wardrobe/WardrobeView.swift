@@ -90,7 +90,7 @@ struct WardrobeView: View {
                     Text("Add a top, a bottom and shoes to get an outfit.").foregroundStyle(.secondary)
                 } else {
                     ForEach(suggestion) { garmentRow($0, compact: true) }
-                    Button("Wear this") { wardrobe.wear(suggestion, now: now) }.buttonStyle(.borderedProminent)
+                    Button("Wear this") { wardrobe.wear(suggestion, now: now) }.buttonStyle(.glassProminent)
                 }
             }
             if let scanError { Text(scanError).font(.footnote).foregroundStyle(.red) }

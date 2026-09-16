@@ -23,7 +23,8 @@ struct CoachTools {
     // MARK: - Definitions
 
     static let definitions: [[String: Any]] = [
-        tool("get_plan", "Today's blocks with times and status (done, current, upcoming, missed).", [:]),
+        // Plan
+        tool("get_plan", "Today's blocks with ids, times and status (done, current, upcoming, missed).", [:]),
         tool("add_block", "Add a block to the plan. Times are HH:MM 24h. kind: fixed (notifies at start), window (anytime in range), free (no clock).", [
             "label": str("Short label"), "kind": enumOf(["fixed", "window", "free"]),
             "start": str("HH:MM, omit for free"), "end": str("HH:MM, omit for free"),
@@ -40,30 +41,68 @@ struct CoachTools {
         tool("mark_done", "Mark a block done for today (or undo with done=false).", [
             "id": str("Block id"), "done": ["type": "boolean", "description": "default true"],
         ], required: ["id"]),
+        // Food
         tool("get_pantry", "Pantry items with quantity, unit and minimum; items below minimum are on the grocery list.", [:]),
-        tool("add_pantry_item", "Add a pantry item, or set the quantity of an existing one with the same name.", [
+        tool("add_pantry_item", "Add a pantry item, or set quantity/unit/minimum of an existing one with the same name.", [
             "name": str("Item name"), "quantity": num("Amount on hand"), "unit": str("g, pcs, L, scoops…"),
             "min_quantity": num("Below this it goes on the grocery list; default = half of quantity"),
         ], required: ["name", "quantity", "unit"]),
         tool("adjust_pantry", "Add (positive) or remove (negative) an amount from a pantry item, e.g. after cooking or shopping.", [
             "name": str("Item name"), "delta": num("Amount to add; negative to remove"),
         ], required: ["name", "delta"]),
+        tool("delete_pantry_item", "Remove an item from the pantry entirely.", ["name": str("Item name")], required: ["name"]),
+        tool("get_grocery_list", "Items below their minimum, with how much to buy.", [:]),
+        tool("get_meals_today", "Meals logged today with ids, plus totals vs targets, and the quick-log presets.", [:]),
         tool("log_meal", "Log a meal eaten today with calories and protein.", [
             "name": str("Meal name"), "kcal": ["type": "integer"], "protein_grams": ["type": "integer"],
         ], required: ["name", "kcal", "protein_grams"]),
-        tool("get_grocery_list", "Items below their minimum, with how much to buy.", [:]),
-        tool("get_closet", "All garments with category, color, warmth, style and laundry status.", [:]),
+        tool("delete_meal", "Delete a logged meal by id (from get_meals_today).", ["id": str("Meal id")], required: ["id"]),
+        tool("set_targets", "Set the daily calorie and/or protein targets.", [
+            "kcal": ["type": "integer"], "protein_grams": ["type": "integer"],
+        ]),
+        tool("add_preset", "Add or update a quick-log meal preset.", [
+            "name": str(""), "kcal": ["type": "integer"], "protein_grams": ["type": "integer"],
+        ], required: ["name", "kcal", "protein_grams"]),
+        tool("delete_preset", "Delete a quick-log preset by name.", ["name": str("")], required: ["name"]),
+        // Closet
+        tool("get_closet", "All garments with category, color, warmth, style, wear count and laundry status. Also the current weather/style setting.", [:]),
         tool("add_garment", "Add a garment to the closet from a description (no photo).", [
             "name": str("e.g. navy hoodie"), "category": enumOf(["top", "bottom", "shoes", "outer", "accessory"]),
             "color": str(""), "warmth": ["type": "integer", "description": "1 light, 2 mid, 3 warm"],
-            "formality": enumOf(["sport", "casual", "smart"]),
+            "formality": enumOf(["sport", "casual", "smart"]), "wash_after": ["type": "integer", "description": "wears before washing; 0 never"],
         ], required: ["name", "category", "color"]),
+        tool("update_garment", "Change a garment's fields. Only pass what changes.", [
+            "name": str("Current name"), "new_name": str(""), "category": enumOf(["top", "bottom", "shoes", "outer", "accessory"]),
+            "color": str(""), "warmth": ["type": "integer"], "formality": enumOf(["sport", "casual", "smart"]),
+            "wash_after": ["type": "integer"],
+        ], required: ["name"]),
+        tool("delete_garment", "Remove a garment from the closet.", ["name": str("")], required: ["name"]),
         tool("wear_outfit", "Log that the user is wearing these garments today (bumps wear counts).", [
             "names": ["type": "array", "items": ["type": "string"], "description": "Garment names"],
         ], required: ["names"]),
+        tool("mark_washed", "Reset wear count after washing. Pass names, or all=true for the whole laundry pile.", [
+            "names": ["type": "array", "items": ["type": "string"]], "all": ["type": "boolean"],
+        ]),
+        tool("set_closet_context", "Set today's weather and/or style used for outfit suggestions.", [
+            "weather": enumOf(["cold", "mild", "hot"]), "style": enumOf(["sport", "casual", "smart"]),
+        ]),
+        // Study & income
+        tool("get_study", "Study minutes today and this week vs goal, running session, recent sessions with ids.", [:]),
+        tool("add_study_session", "Log a study session after the fact.", [
+            "minutes": ["type": "integer"], "topic": str(""), "start": str("HH:MM today; default = now minus minutes"),
+        ], required: ["minutes"]),
+        tool("delete_study_session", "Delete a study session by id (from get_study).", ["id": str("")], required: ["id"]),
+        tool("set_study_goal", "Set the weekly study goal in minutes.", ["minutes": ["type": "integer"]], required: ["minutes"]),
+        tool("get_income", "This month's income entries with ids, per-source totals, month and year totals.", [:]),
+        tool("add_income", "Log income.", [
+            "source": str("salary, freelance…"), "amount": num("In the user's currency"), "date": str("YYYY-MM-DD; default today"),
+        ], required: ["source", "amount"]),
+        tool("delete_income", "Delete an income entry by id (from get_income).", ["id": str("")], required: ["id"]),
+        // Memory
         tool("remember", "Save a durable fact or preference about the user to the Coach profile's Memory section.", [
             "note": str("One line, e.g. 'hates broccoli' or 'gym closed on Sundays'"),
         ], required: ["note"]),
+        tool("forget", "Remove Memory lines containing this text.", ["text": str("")], required: ["text"]),
     ]
 
     private static func tool(_ name: String, _ description: String, _ props: [String: Any], required: [String] = []) -> [String: Any] {
@@ -177,10 +216,11 @@ struct CoachTools {
             return Result(output: list.isEmpty ? "Nothing is below minimum." : food.groceryText())
 
         case "get_closet":
-            guard !wardrobe.closet.isEmpty else { return Result(output: "Closet is empty.") }
-            let lines = wardrobe.closet.map {
-                "\($0.name) | \($0.category.rawValue) | \($0.color) | warmth \($0.warmth) | \($0.formality.rawValue)" + ($0.needsWash ? " | needs wash" : "")
-            }
+            var lines = ["Weather \(wardrobe.weather.rawValue), style \(wardrobe.formality.rawValue)"]
+            if wardrobe.closet.isEmpty { lines.append("Closet is empty.") }
+            lines.append(contentsOf: wardrobe.closet.map {
+                "\($0.name) | \($0.category.rawValue) | \($0.color) | warmth \($0.warmth) | \($0.formality.rawValue) | worn \($0.wearsSinceWash)/\($0.washAfter)" + ($0.needsWash ? " | needs wash" : "")
+            })
             return Result(output: lines.joined(separator: "\n"))
 
         case "add_garment":
@@ -190,7 +230,8 @@ struct CoachTools {
             }
             let warmth = min(3, max(1, Self.int(input["warmth"]) ?? 2))
             let formality = (input["formality"] as? String).flatMap(Formality.init(rawValue:)) ?? .casual
-            let g = Garment(name: name, category: category, color: color, warmth: warmth, formality: formality, washAfter: category.defaultWashAfter)
+            let g = Garment(name: name, category: category, color: color, warmth: warmth, formality: formality,
+                            washAfter: Self.int(input["wash_after"]).map { max(0, $0) } ?? category.defaultWashAfter)
             wardrobe.add(g, imageData: nil)
             return Result(output: "Added \(name) to the closet", summary: "Closet: added \(name)")
 
@@ -200,6 +241,146 @@ struct CoachTools {
             guard !garments.isEmpty else { return Result(output: "No matching garments", isError: true) }
             wardrobe.wear(garments, now: today)
             return Result(output: "Wearing: " + garments.map(\.name).joined(separator: ", "), summary: "Wearing " + garments.map(\.name).joined(separator: ", "))
+
+        case "delete_pantry_item":
+            guard let name = input["name"] as? String, let item = food.pantry.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+                return Result(output: "No pantry item with that name", isError: true)
+            }
+            food.deleteItem(id: item.id)
+            return Result(output: "Removed \(item.name)", summary: "Pantry: removed \(item.name)")
+
+        case "get_meals_today":
+            let m = food.macros(on: today)
+            var lines = ["Totals: \(m.kcal)/\(food.targets.kcal) kcal, \(m.proteinGrams)/\(food.targets.proteinGrams) g protein"]
+            let meals = food.meals(on: today)
+            lines.append(meals.isEmpty ? "No meals logged today." : meals.map { "\($0.id) | \($0.date.formatted(date: .omitted, time: .shortened)) | \($0.name) | \($0.kcal) kcal | \($0.proteinGrams) g" }.joined(separator: "\n"))
+            if !food.presets.isEmpty {
+                lines.append("Presets: " + food.presets.map { "\($0.name) (\($0.kcal) kcal, \($0.proteinGrams) g)" }.joined(separator: "; "))
+            }
+            return Result(output: lines.joined(separator: "\n"))
+
+        case "delete_meal":
+            guard let id = input["id"] as? String, let meal = food.meals.first(where: { $0.id == id }) else { return Result(output: "No meal with that id", isError: true) }
+            food.deleteMeal(id: id)
+            return Result(output: "Deleted \(meal.name)", summary: "Removed meal \(meal.name)")
+
+        case "set_targets":
+            var t = food.targets
+            if let k = Self.int(input["kcal"]) { t.kcal = k }
+            if let p = Self.int(input["protein_grams"]) { t.proteinGrams = p }
+            food.targets = t
+            return Result(output: "Targets: \(t.kcal) kcal, \(t.proteinGrams) g protein", summary: "Targets → \(t.kcal) kcal / \(t.proteinGrams) g")
+
+        case "add_preset":
+            guard let name = input["name"] as? String, let kcal = Self.int(input["kcal"]), let p = Self.int(input["protein_grams"]) else {
+                return Result(output: "name, kcal and protein_grams are required", isError: true)
+            }
+            food.addPreset(name: name, kcal: kcal, proteinGrams: p)
+            return Result(output: "Preset saved: \(name)", summary: "Preset: \(name)")
+
+        case "delete_preset":
+            guard let name = input["name"] as? String, let preset = food.presets.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+                return Result(output: "No preset with that name", isError: true)
+            }
+            food.deletePreset(id: preset.id)
+            return Result(output: "Deleted preset \(preset.name)", summary: "Removed preset \(preset.name)")
+
+        case "update_garment":
+            guard let name = input["name"] as? String, var g = wardrobe.closet.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+                return Result(output: "No garment with that name", isError: true)
+            }
+            if let n = input["new_name"] as? String, !n.isEmpty { g.name = n }
+            if let c = (input["category"] as? String).flatMap(GarmentCategory.init(rawValue:)) { g.category = c }
+            if let c = input["color"] as? String { g.color = c }
+            if let w = Self.int(input["warmth"]) { g.warmth = min(3, max(1, w)) }
+            if let f = (input["formality"] as? String).flatMap(Formality.init(rawValue:)) { g.formality = f }
+            if let w = Self.int(input["wash_after"]) { g.washAfter = max(0, w) }
+            wardrobe.update(g)
+            return Result(output: "Updated \(g.name)", summary: "Closet: updated \(g.name)")
+
+        case "delete_garment":
+            guard let name = input["name"] as? String, let g = wardrobe.closet.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+                return Result(output: "No garment with that name", isError: true)
+            }
+            wardrobe.remove(id: g.id)
+            return Result(output: "Removed \(g.name)", summary: "Closet: removed \(g.name)")
+
+        case "mark_washed":
+            if input["all"] as? Bool == true {
+                let n = wardrobe.laundry.count
+                wardrobe.washAll()
+                return Result(output: "Laundry pile cleared (\(n) items)", summary: "Washed everything (\(n))")
+            }
+            let names = (input["names"] as? [String]) ?? []
+            let items = names.compactMap { n in wardrobe.closet.first { $0.name.caseInsensitiveCompare(n) == .orderedSame } }
+            guard !items.isEmpty else { return Result(output: "No matching garments", isError: true) }
+            for g in items { wardrobe.washed(id: g.id) }
+            return Result(output: "Washed: " + items.map(\.name).joined(separator: ", "), summary: "Washed " + items.map(\.name).joined(separator: ", "))
+
+        case "set_closet_context":
+            if let w = (input["weather"] as? String).flatMap(Weather.init(rawValue:)) { wardrobe.weather = w }
+            if let f = (input["style"] as? String).flatMap(Formality.init(rawValue:)) { wardrobe.formality = f }
+            return Result(output: "Weather \(wardrobe.weather.rawValue), style \(wardrobe.formality.rawValue)", summary: "Outfit context: \(wardrobe.weather.rawValue), \(wardrobe.formality.rawValue)")
+
+        case "get_study":
+            var lines = ["Today \(track.studyMinutes(on: today)) min; this week \(track.studyMinutes(weekOf: today)) / \(track.weeklyStudyGoalMinutes) min"]
+            if let since = track.runningSince { lines.append("Running since \(since.formatted(date: .omitted, time: .shortened)) (\(track.runningTopic))") }
+            let recent = track.recentSessions(limit: 10)
+            if !recent.isEmpty {
+                lines.append(recent.map { "\($0.id) | \($0.start.formatted(.dateTime.weekday(.abbreviated).hour().minute())) | \($0.topic) | \($0.minutes) min" }.joined(separator: "\n"))
+            }
+            return Result(output: lines.joined(separator: "\n"))
+
+        case "add_study_session":
+            guard let minutes = Self.int(input["minutes"]), minutes > 0 else { return Result(output: "minutes is required", isError: true) }
+            let topic = input["topic"] as? String ?? ""
+            let start: Date
+            if let hm = Self.hm(input["start"]), let d = calendar.date(bySettingHour: hm.hour ?? 0, minute: hm.minute ?? 0, second: 0, of: today) {
+                start = d
+            } else {
+                start = today.addingTimeInterval(-Double(minutes) * 60)
+            }
+            track.addSession(start: start, minutes: minutes, topic: topic)
+            return Result(output: "Logged \(minutes) min of study", summary: "Study +\(minutes) min")
+
+        case "delete_study_session":
+            guard let id = input["id"] as? String, track.sessions.contains(where: { $0.id == id }) else { return Result(output: "No session with that id", isError: true) }
+            track.deleteSession(id: id)
+            return Result(output: "Deleted session", summary: "Removed a study session")
+
+        case "set_study_goal":
+            guard let m = Self.int(input["minutes"]), m > 0 else { return Result(output: "minutes is required", isError: true) }
+            track.weeklyStudyGoalMinutes = m
+            return Result(output: "Weekly goal: \(m) min", summary: "Study goal → \(m) min/week")
+
+        case "get_income":
+            let entries = track.incomeEntries(monthOf: today)
+            var lines = ["Month total \(track.incomeTotal(monthOf: today)); year total \(track.incomeTotal(yearOf: today))"]
+            lines.append(contentsOf: track.incomeBySource(monthOf: today).map { "\($0.source): \($0.amount)" })
+            if !entries.isEmpty {
+                lines.append(entries.map { "\($0.id) | \($0.date.formatted(date: .abbreviated, time: .omitted)) | \($0.source) | \($0.amount)" }.joined(separator: "\n"))
+            }
+            return Result(output: lines.joined(separator: "\n"))
+
+        case "add_income":
+            guard let source = input["source"] as? String, let amount = Self.double(input["amount"]) else { return Result(output: "source and amount are required", isError: true) }
+            var date = today
+            if let s = input["date"] as? String {
+                let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"; f.timeZone = calendar.timeZone
+                if let d = f.date(from: s) { date = d }
+            }
+            track.addIncome(source: source, amount: Decimal(amount), on: date)
+            return Result(output: "Logged \(amount) from \(source)", summary: "Income +\(amount) (\(source))")
+
+        case "delete_income":
+            guard let id = input["id"] as? String, track.income.contains(where: { $0.id == id }) else { return Result(output: "No income entry with that id", isError: true) }
+            track.deleteIncome(id: id)
+            return Result(output: "Deleted income entry", summary: "Removed an income entry")
+
+        case "forget":
+            guard let text = input["text"] as? String, !text.isEmpty else { return Result(output: "text is required", isError: true) }
+            let n = CoachProfile.forget(text)
+            return Result(output: n == 0 ? "Nothing in memory matched" : "Forgot \(n) line(s)", summary: n == 0 ? nil : "Forgot: \(text)")
 
         case "remember":
             guard let note = input["note"] as? String, !note.isEmpty else { return Result(output: "note is required", isError: true) }

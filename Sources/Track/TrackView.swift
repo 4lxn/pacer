@@ -81,8 +81,7 @@ struct TrackContent: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(now.formatted(.dateTime.month(.wide).year())).font(.caption).foregroundStyle(.secondary)
                     Text(track.incomeTotal(monthOf: now), format: .currency(code: currency)).font(.title2.weight(.semibold)).monospacedDigit()
-                    Text("Year: ") .font(.caption).foregroundStyle(.secondary)
-                    + Text(track.incomeTotal(yearOf: now), format: .currency(code: currency)).font(.caption).foregroundStyle(.secondary)
+                    Text("Year: \(track.incomeTotal(yearOf: now), format: .currency(code: currency))").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button { addingIncome = true } label: { Label("Add", systemImage: "plus") }.buttonStyle(.bordered)
