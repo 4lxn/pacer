@@ -3,11 +3,11 @@ import UIKit
 
 struct DayView: View {
     @Bindable var store: CompletionStore
+    @Bindable var health: HealthStore
     @Environment(\.scenePhase) private var scenePhase
     @State private var now = Date.now
     @State private var notificationsDenied = false
     @State private var bannerDismissed = false
-    @State private var showCoach = false
 
     private let calendar = Calendar.current
     private let tick = Timer.publish(every: 20, on: .main, in: .common).autoconnect()
@@ -40,16 +40,17 @@ struct DayView: View {
             if phase == .active {
                 now = .now
                 store.reload()
-                Task { await refreshNotifications() }
+                Task {
+                    await refreshNotifications()
+                    await autoCompleteFromHealth()
+                }
             }
         }
         .task {
             let granted = await NotificationScheduler.requestAuthorization()
             notificationsDenied = !granted
             await NotificationScheduler.register(Plan.blocks)
-        }
-        .sheet(isPresented: $showCoach) {
-            CoachSheet(blocks: blocks, now: now, completed: completed)
+            await autoCompleteFromHealth()
         }
     }
 
@@ -64,12 +65,6 @@ struct DayView: View {
                     .monospacedDigit()
             }
             Spacer()
-            Button {
-                showCoach = true
-            } label: {
-                Label("Coach", systemImage: "bubble.left.and.text.bubble.right")
-            }
-            .buttonStyle(.bordered)
         }
     }
 
@@ -133,5 +128,14 @@ struct DayView: View {
     private func refreshNotifications() async {
         notificationsDenied = await NotificationScheduler.isDenied()
         await NotificationScheduler.register(Plan.blocks)
+    }
+
+    /// A run or strength workout in Apple Health today closes the matching blocks.
+    private func autoCompleteFromHealth() async {
+        guard health.isAvailable else { return }
+        await health.refresh(now: now, calendar: calendar)
+        for id in DayLogic.autoCompletions(blocks, workouts: health.workouts, now: now, completed: completed, calendar: calendar) {
+            store.markDone(id, on: now)
+        }
     }
 }

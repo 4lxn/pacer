@@ -29,12 +29,16 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_CFBundleDisplayName: Autopiloto
+        INFOPLIST_KEY_NSHealthShareUsageDescription: "Autopiloto reads your workouts, weight and steps to close training blocks automatically and show your training week."
+        INFOPLIST_KEY_NSHealthUpdateUsageDescription: "Autopiloto saves the weight you log so it shows up in Health and in your other apps."
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1"
     entitlements:
       path: Autopiloto.entitlements
       properties:
         com.apple.developer.usernotifications.time-sensitive: true
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
   AutopilotoTests:
     type: bundle.unit-test
     platform: iOS
