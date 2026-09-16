@@ -79,8 +79,10 @@ enum CoachContext {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "EEEE yyyy-MM-dd HH:mm"
         var lines = ["## Today: \(formatter.string(from: now))"]
-        if let session = Plan.gymSession(on: now, calendar: calendar) {
-            lines.append("Gym session today: \(session).")
+        for block in blocks {
+            if let note = block.note(on: now, calendar: calendar) {
+                lines.append("\(block.label) today: \(note).")
+            }
         }
         lines.append("Blocks (time, label, status):")
         for block in DayLogic.sorted(blocks) {
