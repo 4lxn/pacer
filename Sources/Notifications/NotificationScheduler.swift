@@ -89,12 +89,8 @@ enum NotificationScheduler {
         }
     }
 
-    static func isAuthorized(center: UNUserNotificationCenter = .current()) async -> Bool {
-        let settings = await center.notificationSettings()
-        switch settings.authorizationStatus {
-        case .authorized, .provisional, .ephemeral: return true
-        case .denied, .notDetermined: return false
-        @unknown default: return false
-        }
+    /// True only when the user has explicitly denied; `.notDetermined` is not a denial yet.
+    static func isDenied(center: UNUserNotificationCenter = .current()) async -> Bool {
+        await center.notificationSettings().authorizationStatus == .denied
     }
 }
