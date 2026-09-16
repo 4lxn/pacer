@@ -47,3 +47,24 @@ snapshot of today's blocks.
 ```sh
 grep -ri "urlsession\|http\|apikey" Sources/ --exclude-dir=Coach   # must print nothing
 ```
+
+## Manual checks in the simulator
+
+```sh
+export DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer
+SIM=$(xcrun simctl list devices booted | grep -o '[0-9A-F-]\{36\}' | head -1)
+
+# Fire a block notification now (after tapping Allow once). Long-press it → Done marks b13 complete
+# without opening the app; relaunch and the row is checked.
+cat > /tmp/block.apns <<'JSON'
+{
+  "Simulator Target Bundle": "com.alan.autopiloto",
+  "aps": { "alert": { "title": "Leave for training", "body": "17:45 – 17:55" }, "category": "BLOCK_ACTIONS", "sound": "default" },
+  "blockId": "b13"
+}
+JSON
+xcrun simctl push "$SIM" com.alan.autopiloto /tmp/block.apns
+
+# Denial path: reset the permission and tap Don't Allow on the next launch.
+xcrun simctl privacy "$SIM" reset all com.alan.autopiloto
+```
