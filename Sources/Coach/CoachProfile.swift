@@ -35,4 +35,16 @@ enum CoachProfile {
     static func save(_ text: String, defaults: UserDefaults = .standard) {
         defaults.set(text, forKey: key)
     }
+
+    /// Appends a line under a `## Memory` section (created on first use). The agent's `remember` tool.
+    static func appendMemory(_ note: String, defaults: UserDefaults = .standard) {
+        var text = load(defaults: defaults)
+        let line = "- \(note.trimmingCharacters(in: .whitespacesAndNewlines))"
+        if text.contains("## Memory") {
+            text += "\n" + line
+        } else {
+            text += "\n\n## Memory\n" + line
+        }
+        save(text, defaults: defaults)
+    }
 }

@@ -65,16 +65,37 @@ async function handleCoach(req, res) {
   if (!allowed) return json(res, 429, { error: "daily limit reached", remaining: 0 });
 
   const body = await readJSON(req);
-  if (!Array.isArray(body.system) || typeof body.question !== "string") {
-    return json(res, 400, { error: "system[] and question required" });
+  if (!Array.isArray(body.system)) return json(res, 400, { error: "system[] required" });
+
+  let messages;
+  let tools;
+  if (Array.isArray(body.messages)) {
+    // Agent shape: the client owns the conversation (thinking/tool_use blocks replay verbatim).
+    if (body.messages.length > 60) return json(res, 400, { error: "too many messages (max 60)" });
+    if (body.tools && (!Array.isArray(body.tools) || body.tools.length > 20)) return json(res, 400, { error: "too many tools (max 20)" });
+    messages = body.messages;
+    tools = body.tools;
+  } else if (typeof body.question === "string") {
+    // Legacy one-shot shape, optionally with a photo (wardrobe scanner).
+    const content = body.image && typeof body.image.data === "string"
+      ? [
+          { type: "image", source: { type: "base64", media_type: body.image.media_type || "image/jpeg", data: body.image.data } },
+          { type: "text", text: body.question },
+        ]
+      : body.question;
+    messages = [{ role: "user", content }];
+  } else {
+    return json(res, 400, { error: "messages[] or question required" });
   }
-  // Optional photo (wardrobe scanner): { media_type, data (base64) } → image block before the text.
-  const content = body.image && typeof body.image.data === "string"
-    ? [
-        { type: "image", source: { type: "base64", media_type: body.image.media_type || "image/jpeg", data: body.image.data } },
-        { type: "text", text: body.question },
-      ]
-    : body.question;
+
+  const payload = {
+    model: MODEL,
+    max_tokens: body.image ? 512 : Number(MAX_TOKENS),
+    system: body.system,
+    messages,
+    fallbacks: "default",
+  };
+  if (tools) payload.tools = tools;
 
   const upstream = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -84,13 +105,7 @@ async function handleCoach(req, res) {
       "anthropic-version": "2023-06-01",
       "anthropic-beta": "server-side-fallback-2026-07-01",
     },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: body.image ? 512 : Number(MAX_TOKENS),
-      system: body.system,
-      messages: [{ role: "user", content }],
-      fallbacks: "default",
-    }),
+    body: JSON.stringify(payload),
   });
   const data = await upstream.json();
   if (!upstream.ok) {
@@ -98,7 +113,7 @@ async function handleCoach(req, res) {
     return json(res, 502, { error: data?.error?.message || "upstream error" });
   }
   const text = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
-  return json(res, 200, { text, remaining, usage: data.usage });
+  return json(res, 200, { text, content: data.content, stop_reason: data.stop_reason, stop_details: data.stop_details, remaining, usage: data.usage });
 }
 
 const server = http.createServer(async (req, res) => {

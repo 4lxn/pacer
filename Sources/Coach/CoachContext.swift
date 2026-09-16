@@ -73,6 +73,19 @@ enum CoachContext {
       add 100 g of rice.
     """
 
+    /// Rules appended to the profile when the Coach runs as an agent with tools.
+    static let agentRules = """
+
+    ## How you work
+    - You have tools. Use them for anything the user asks you to change (plan, pantry, meals, closet,
+      memory); never claim you changed something without calling the tool.
+    - Read before you write when ids matter: call get_plan before update_block / delete_block.
+    - Ask before deleting a block or moving the anchor. Everything else: just do it, then say what changed in one line.
+    - Keep answers short. Reply in the user's language.
+    - When asked what to buy, use get_grocery_list and the pantry, and reason from the user's food rules.
+    - Save durable preferences with remember (e.g. "hates broccoli"); don't save one-off facts.
+    """
+
     /// Today's plan and status, for the volatile part of the system prompt.
     static func snapshot(blocks: [Block], now: Date, completed: Set<String>, calendar: Calendar = .current, extra: [String] = []) -> String {
         let formatter = DateFormatter()

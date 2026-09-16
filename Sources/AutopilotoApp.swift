@@ -7,7 +7,7 @@ struct AutopilotoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(store: appDelegate.store, plan: appDelegate.plan, health: appDelegate.health, food: appDelegate.food, track: appDelegate.track, account: appDelegate.account, wardrobe: appDelegate.wardrobe)
+            RootView(store: appDelegate.store, plan: appDelegate.plan, health: appDelegate.health, food: appDelegate.food, track: appDelegate.track, account: appDelegate.account, wardrobe: appDelegate.wardrobe, agent: appDelegate.agent)
         }
     }
 }
@@ -22,6 +22,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     let track = TrackStore()
     let account = CoachAccount()
     let wardrobe = WardrobeStore()
+    lazy var agent = CoachAgent(
+        chat: CoachChatStore(),
+        tools: CoachTools(plan: plan, completions: store, food: food, wardrobe: wardrobe, health: health, track: track)
+    )
     private lazy var notificationDelegate = NotificationDelegate(store: store, plan: plan)
 
     func application(
