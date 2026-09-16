@@ -91,6 +91,66 @@ struct CoachClient: Sendable {
     struct ProxyRequest: Encodable {
         let system: [Request.TextBlock]
         let question: String
+        var image: ImagePayload?
+    }
+
+    struct ImagePayload: Encodable {
+        let media_type: String
+        let data: String
+    }
+
+    /// Direct-mode request with an image block before the text (Claude vision).
+    struct VisionRequest: Encodable {
+        struct Content: Encodable {
+            struct Source: Encodable { let type = "base64"; let media_type: String; let data: String }
+            let type: String
+            var source: Source?
+            var text: String?
+        }
+        struct Message: Encodable { let role: String; let content: [Content] }
+        let model: String
+        let max_tokens: Int
+        let messages: [Message]
+        let fallbacks: String
+    }
+
+    static func makeVisionRequest(apiKey: String, model: String, jpeg: Data, prompt: String) throws -> URLRequest {
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 120
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        request.setValue("server-side-fallback-2026-07-01", forHTTPHeaderField: "anthropic-beta")
+        let body = VisionRequest(
+            model: model, max_tokens: 512,
+            messages: [.init(role: "user", content: [
+                .init(type: "image", source: .init(media_type: "image/jpeg", data: jpeg.base64EncodedString()), text: nil),
+                .init(type: "text", source: nil, text: prompt),
+            ])],
+            fallbacks: "default"
+        )
+        request.httpBody = try JSONEncoder().encode(body)
+        return request
+    }
+
+    /// Describe a photo. Returns the model's text (JSON per the prompt).
+    func describe(jpeg: Data, prompt: String) async throws -> String {
+        switch auth {
+        case let .apiKey(key):
+            let request = try Self.makeVisionRequest(apiKey: key, model: model, jpeg: jpeg, prompt: prompt)
+            let (data, response) = try await session.data(for: request)
+            return try Self.parse(data, status: (response as? HTTPURLResponse)?.statusCode ?? 0)
+        case let .proxy(base, token):
+            var request = try Self.makeProxyRequest(base: base, sessionToken: token, staticSystem: "You describe clothing photos.", snapshot: "", question: prompt)
+            request.httpBody = try JSONEncoder().encode(ProxyRequest(
+                system: [.init(text: "You describe clothing photos.", cache_control: nil)],
+                question: prompt,
+                image: ImagePayload(media_type: "image/jpeg", data: jpeg.base64EncodedString())
+            ))
+            let (data, response) = try await session.data(for: request)
+            return try Self.parseProxy(data, status: (response as? HTTPURLResponse)?.statusCode ?? 0)
+        }
     }
 
     struct ProxyResponse: Decodable {
