@@ -5,16 +5,19 @@ struct RootView: View {
     @Bindable var plan: PlanStore
     @Bindable var health: HealthStore
     @Bindable var food: FoodStore
+    @Bindable var track: TrackStore
 
     var body: some View {
         TabView {
-            DayView(store: store, plan: plan, health: health)
+            DayView(store: store, plan: plan, health: health, track: track)
                 .tabItem { Label("Today", systemImage: "sun.max") }
             TrainView(health: health)
                 .tabItem { Label("Train", systemImage: "figure.run") }
             FoodView(food: food)
                 .tabItem { Label("Food", systemImage: "fork.knife") }
-            CoachView(store: store, plan: plan, health: health, food: food)
+            TrackView(track: track)
+                .tabItem { Label("Track", systemImage: "chart.bar") }
+            CoachView(store: store, plan: plan, health: health, food: food, track: track)
                 .tabItem { Label("Coach", systemImage: "bubble.left.and.text.bubble.right") }
         }
         .fullScreenCover(isPresented: Binding(get: { plan.needsOnboarding }, set: { _ in })) {

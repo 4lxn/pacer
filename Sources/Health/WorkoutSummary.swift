@@ -17,17 +17,22 @@ struct WorkoutSummary: Identifiable, Hashable, Sendable {
     var duration: TimeInterval { end.timeIntervalSince(start) }
 }
 
-/// What kind of workout closes a block automatically.
+/// What closes a block automatically: a Health workout of a kind, or a study session.
 enum WorkoutMatch: String, Codable, Sendable {
     case run
     case strength
+    case study
 
     func matches(_ workout: WorkoutSummary) -> Bool {
         switch self {
         case .run: workout.activity == .run
         case .strength: workout.activity == .strength
+        case .study: false
         }
     }
+
+    /// Minutes of study on the day needed to close a `.study` block.
+    static let studyMinutesToClose = 20
 }
 
 struct WeekTotals: Equatable {
@@ -61,10 +66,11 @@ struct WeekTotals: Equatable {
 extension DayLogic {
     /// Ids of blocks that a workout done today closes: the block has an `autoComplete` match, is not
     /// done yet, and a matching workout started on the same calendar day as `now`.
-    static func autoCompletions(_ blocks: [Block], workouts: [WorkoutSummary], now: Date, completed: Set<String>, calendar: Calendar = .current) -> [String] {
+    static func autoCompletions(_ blocks: [Block], workouts: [WorkoutSummary], studyMinutesToday: Int = 0, now: Date, completed: Set<String>, calendar: Calendar = .current) -> [String] {
         let today = workouts.filter { calendar.isDate($0.start, inSameDayAs: now) }
         return blocks.compactMap { block in
             guard let match = block.autoComplete, !completed.contains(block.id) else { return nil }
+            if match == .study { return studyMinutesToday >= WorkoutMatch.studyMinutesToClose ? block.id : nil }
             return today.contains(where: match.matches) ? block.id : nil
         }
     }

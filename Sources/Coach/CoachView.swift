@@ -5,6 +5,7 @@ struct CoachView: View {
     @Bindable var plan: PlanStore
     @Bindable var health: HealthStore
     @Bindable var food: FoodStore
+    @Bindable var track: TrackStore
 
     @State private var apiKey: String = APIKeyStore.load() ?? ""
     @State private var editingKey = false
@@ -102,7 +103,7 @@ struct CoachView: View {
                 staticSystem: CoachContext.training,
                 snapshot: CoachContext.snapshot(
                     blocks: blocks, now: now, completed: store.completed(on: now), calendar: calendar,
-                    extra: [health.coachSummary(now: now, calendar: calendar), food.coachSummary(now: now)]
+                    extra: [health.coachSummary(now: now, calendar: calendar), food.coachSummary(now: now), track.coachSummary(now: now)]
                 )
             )
         } catch {

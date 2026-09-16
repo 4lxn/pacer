@@ -5,6 +5,7 @@ struct DayView: View {
     @Bindable var store: CompletionStore
     @Bindable var plan: PlanStore
     @Bindable var health: HealthStore
+    @Bindable var track: TrackStore
     @Environment(\.scenePhase) private var scenePhase
     @State private var now = Date.now
     @State private var notificationsDenied = false
@@ -49,6 +50,7 @@ struct DayView: View {
             }
         }
         .sheet(isPresented: $editingPlan) { PlanView(plan: plan) }
+        .onChange(of: track.sessions) { _, _ in Task { await autoCompleteFromHealth() } }
         .task(id: plan.needsOnboarding) {
             // Onboarding asks for the permission itself; don't double-prompt behind the cover.
             guard !plan.needsOnboarding else { return }
@@ -142,12 +144,13 @@ struct DayView: View {
         await NotificationScheduler.register(plan.blocks)
     }
 
-    /// A run or strength workout in Apple Health today closes the matching blocks.
+    /// A run or strength workout in Apple Health today, or 20+ min of study, closes the matching blocks.
     private func autoCompleteFromHealth() async {
-        guard health.isAvailable else { return }
-        await health.refresh(now: now, calendar: calendar)
-        for id in DayLogic.autoCompletions(blocks, workouts: health.workouts, now: now, completed: completed, calendar: calendar) {
-            store.markDone(id, on: now)
-        }
+        if health.isAvailable { await health.refresh(now: now, calendar: calendar) }
+        let ids = DayLogic.autoCompletions(
+            blocks, workouts: health.workouts, studyMinutesToday: track.studyMinutes(on: now),
+            now: now, completed: completed, calendar: calendar
+        )
+        for id in ids { store.markDone(id, on: now) }
     }
 }
