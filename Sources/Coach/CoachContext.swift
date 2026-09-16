@@ -74,7 +74,7 @@ enum CoachContext {
     """
 
     /// Today's plan and status, for the volatile part of the system prompt.
-    static func snapshot(blocks: [Block], now: Date, completed: Set<String>, calendar: Calendar = .current) -> String {
+    static func snapshot(blocks: [Block], now: Date, completed: Set<String>, calendar: Calendar = .current, extra: [String] = []) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "EEEE yyyy-MM-dd HH:mm"
@@ -89,6 +89,10 @@ enum CoachContext {
             let time = block.start.map(NotificationScheduler.clock) ?? "anytime"
             let status = block.status(now: now, completed: completed, calendar: calendar)
             lines.append("- \(time) \(block.label) — \(label(status))")
+        }
+        for section in extra where !section.isEmpty {
+            lines.append("")
+            lines.append(section)
         }
         return lines.joined(separator: "\n")
     }

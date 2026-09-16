@@ -90,6 +90,29 @@ final class HealthStore {
     }
     #endif
 
+    /// Section for the Coach snapshot: today's workouts, week totals, latest weight.
+    func coachSummary(now: Date, calendar: Calendar) -> String {
+        guard isAvailable, isAuthorized else { return "" }
+        var lines = ["## Training (Apple Health)"]
+        let today = workouts.filter { calendar.isDate($0.start, inSameDayAs: now) }
+        if today.isEmpty {
+            lines.append("No workout logged today yet.")
+        } else {
+            lines.append("Today: " + today.map { w in
+                var s = "\(w.activity.rawValue) \(Int(w.duration / 60)) min"
+                if let m = w.distanceMeters, m > 0 { s += String(format: " %.1f km", m / 1000) }
+                return s + " (\(w.source))"
+            }.joined(separator: "; "))
+        }
+        let week = WeekTotals.make(workouts, weekOf: now, calendar: calendar)
+        lines.append(String(format: "This week: %d runs, %.1f km, %d strength sessions, %d min", week.runs, week.runKilometers, week.lifts, week.minutes))
+        if let last = weights.last {
+            lines.append(String(format: "Latest weight: %.1f kg (%@)", last.kg, last.date.formatted(date: .abbreviated, time: .omitted)))
+        }
+        lines.append("Steps today: \(stepsToday)")
+        return lines.joined(separator: "\n")
+    }
+
     // MARK: - Queries
 
     private func fetchWorkouts(since: Date) async throws -> [WorkoutSummary] {

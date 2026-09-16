@@ -7,7 +7,7 @@ struct AutopilotoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(store: appDelegate.store, plan: appDelegate.plan, health: appDelegate.health)
+            RootView(store: appDelegate.store, plan: appDelegate.plan, health: appDelegate.health, food: appDelegate.food)
         }
     }
 }
@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     let store = CompletionStore()
     let plan = PlanStore()
     let health = HealthStore()
+    let food = FoodStore()
     private lazy var notificationDelegate = NotificationDelegate(store: store, plan: plan)
 
     func application(
