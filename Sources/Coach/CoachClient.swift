@@ -196,6 +196,62 @@ struct CoachClient: Sendable {
         return token
     }
 
+    // MARK: - Agent (tool use, multi-turn)
+
+    /// Builds a Messages-API request with tools from raw JSON dictionaries so assistant blocks
+    /// (thinking, tool_use) replay exactly as received. Works for both auth modes.
+    static func makeAgentRequest(auth: Auth, model: String, system: [[String: Any]], messages: [[String: Any]], tools: [[String: Any]]) throws -> URLRequest {
+        var request: URLRequest
+        var body: [String: Any]
+        switch auth {
+        case let .apiKey(key):
+            request = URLRequest(url: endpoint)
+            request.setValue(key, forHTTPHeaderField: "x-api-key")
+            request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+            request.setValue("server-side-fallback-2026-07-01", forHTTPHeaderField: "anthropic-beta")
+            body = ["model": model, "max_tokens": 4096, "system": system, "messages": messages, "tools": tools, "fallbacks": "default"]
+        case let .proxy(base, token):
+            request = URLRequest(url: base.appendingPathComponent("v1/coach"))
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            body = ["system": system, "messages": messages, "tools": tools]
+        }
+        request.httpMethod = "POST"
+        request.timeoutInterval = 180
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return request
+    }
+
+    struct AgentResponse {
+        var content: [[String: Any]]
+        var stopReason: String?
+        var stopDetails: [String: Any]?
+        var remaining: Int?
+    }
+
+    static func parseAgent(_ data: Data, status: Int) throws -> AgentResponse {
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw CoachError.http(status, String(decoding: data, as: UTF8.self))
+        }
+        if let error = json["error"] as? [String: Any], let message = error["message"] as? String {
+            throw CoachError.http(status, message)
+        }
+        if let error = json["error"] as? String { throw CoachError.http(status, error) }
+        guard (200..<300).contains(status) else { throw CoachError.http(status, String(decoding: data, as: UTF8.self)) }
+        return AgentResponse(
+            content: json["content"] as? [[String: Any]] ?? [],
+            stopReason: json["stop_reason"] as? String,
+            stopDetails: json["stop_details"] as? [String: Any],
+            remaining: json["remaining"] as? Int
+        )
+    }
+
+    /// Sends a prepared request; the caller parses on its own actor.
+    func send(_ request: URLRequest) async throws -> (Data, Int) {
+        let (data, response) = try await session.data(for: request)
+        return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
+    }
+
     static func parse(_ data: Data, status: Int) throws -> String {
         let decoded = try JSONDecoder().decode(Response.self, from: data)
         if let error = decoded.error {
