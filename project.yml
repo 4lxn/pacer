@@ -1,0 +1,60 @@
+name: Autopiloto
+options:
+  bundleIdPrefix: com.alan
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+    GCC_TREAT_WARNINGS_AS_ERRORS: YES
+    CODE_SIGN_STYLE: Automatic
+    # Set your Apple Developer Team ID here (or pick the team in Xcode > Signing & Capabilities).
+    DEVELOPMENT_TEAM: ""
+targets:
+  Autopiloto:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alan.autopiloto
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_ENTITLEMENTS: Autopiloto.entitlements
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_CFBundleDisplayName: Autopiloto
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+    entitlements:
+      path: Autopiloto.entitlements
+      properties:
+        com.apple.developer.usernotifications.time-sensitive: true
+  AutopilotoTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Autopiloto
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.alan.autopiloto.tests
+schemes:
+  Autopiloto:
+    build:
+      targets:
+        Autopiloto: all
+        AutopilotoTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - AutopilotoTests
