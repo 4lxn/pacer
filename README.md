@@ -32,6 +32,17 @@ xcodebuild -scheme Autopiloto -destination 'platform=iOS,name=<your iPhone name>
 
 `Autopiloto.xcodeproj` is generated and git-ignored; edit `project.yml` instead.
 
+## Apple Health (Train tab)
+
+Autopiloto reads workouts, weight and steps from Apple Health and marks the Run / Gym blocks done
+when a matching workout lands today. Feed Health from your watch apps once:
+
+- Garmin Connect: More → Settings → Connected Apps → Apple Health → enable workouts, weight, steps.
+- Strava: Settings → Applications, Services and Devices → Health → connect.
+
+No Garmin or Strava API keys, no server. The weight you log in the Train tab is written to Health.
+Debug builds have an "Add test run" button to exercise the pipeline in the simulator.
+
 ## Changing the plan
 
 There is no editing UI. Edit the `Plan.blocks` array in `Sources/Models/Plan.swift` and rebuild.

@@ -14,6 +14,7 @@ struct Block: Codable, Identifiable, Hashable, Sendable {
     var end: DateComponents?     // hour + minute only; nil for .free
     var isAnchor: Bool           // exactly one block in the plan; never droppable
     var weekdays: Set<Int>?      // Calendar weekday (1 = Sunday … 7 = Saturday); nil = every day
+    var autoComplete: WorkoutMatch?   // a matching Apple Health workout today marks this block done
 
     init(
         id: String,
@@ -22,7 +23,8 @@ struct Block: Codable, Identifiable, Hashable, Sendable {
         start: DateComponents? = nil,
         end: DateComponents? = nil,
         isAnchor: Bool = false,
-        weekdays: Set<Int>? = nil
+        weekdays: Set<Int>? = nil,
+        autoComplete: WorkoutMatch? = nil
     ) {
         self.id = id
         self.label = label
@@ -31,6 +33,7 @@ struct Block: Codable, Identifiable, Hashable, Sendable {
         self.end = end
         self.isAnchor = isAnchor
         self.weekdays = weekdays
+        self.autoComplete = autoComplete
     }
 
     /// Wall-clock start on the calendar day of `day`. Built with `Calendar`, so it survives DST.

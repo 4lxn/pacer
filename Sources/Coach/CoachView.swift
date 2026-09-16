@@ -1,11 +1,8 @@
 import SwiftUI
 
-struct CoachSheet: View {
-    let blocks: [Block]
-    let now: Date
-    let completed: Set<String>
+struct CoachView: View {
+    @Bindable var store: CompletionStore
 
-    @Environment(\.dismiss) private var dismiss
     @State private var apiKey: String = APIKeyStore.load() ?? ""
     @State private var editingKey = false
     @State private var keyDraft = ""
@@ -14,14 +11,11 @@ struct CoachSheet: View {
     @State private var errorText: String?
     @State private var isLoading = false
 
+    private let calendar = Calendar.current
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("Coach").font(.title2.weight(.semibold))
-                Spacer()
-                Button("Close") { dismiss() }
-            }
-
+            Text("Coach").font(.title2.weight(.semibold))
             if apiKey.isEmpty || editingKey {
                 keyEntry
             } else {
@@ -29,7 +23,7 @@ struct CoachSheet: View {
             }
         }
         .padding()
-        .presentationDetents([.large])
+        .background(Color(uiColor: .systemGroupedBackground))
     }
 
     private var keyEntry: some View {
@@ -96,12 +90,14 @@ struct CoachSheet: View {
         isLoading = true
         errorText = nil
         defer { isLoading = false }
+        let now = Date.now
+        let blocks = DayLogic.sorted(Plan.today(on: now, calendar: calendar))
         do {
             let client = CoachClient(apiKey: apiKey)
             answer = try await client.ask(
                 q,
                 staticSystem: CoachContext.training,
-                snapshot: CoachContext.snapshot(blocks: blocks, now: now, completed: completed)
+                snapshot: CoachContext.snapshot(blocks: blocks, now: now, completed: store.completed(on: now), calendar: calendar)
             )
         } catch {
             errorText = error.localizedDescription
