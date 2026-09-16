@@ -49,9 +49,9 @@ final class CoachClientTests: XCTestCase {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "America/Mexico_City")!
         let now = calendar.date(from: DateComponents(year: 2026, month: 9, day: 16, hour: 11, minute: 0))!
-        let snapshot = CoachContext.snapshot(blocks: Plan.today(on: now, calendar: calendar), now: now, completed: ["b01"], calendar: calendar)
+        let snapshot = CoachContext.snapshot(blocks: Plan.blocks.filter { $0.occurs(on: now, calendar: calendar) }, now: now, completed: ["b01"], calendar: calendar)
         XCTAssertTrue(snapshot.contains("Wednesday 2026-09-16 11:00"))
-        XCTAssertTrue(snapshot.contains("Gym session today: Upper 2."))
+        XCTAssertTrue(snapshot.contains("Gym · Min-Max B1 today: Upper 2."))
         XCTAssertTrue(snapshot.contains("07:30 Wake up — done"))
         XCTAssertTrue(snapshot.contains("10:00 Work block — current"))
         XCTAssertTrue(snapshot.contains("anytime Send one application — not done yet"))

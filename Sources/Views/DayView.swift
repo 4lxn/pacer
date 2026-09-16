@@ -3,6 +3,7 @@ import UIKit
 
 struct DayView: View {
     @Bindable var store: CompletionStore
+    @Bindable var plan: PlanStore
     @Bindable var health: HealthStore
     @Environment(\.scenePhase) private var scenePhase
     @State private var now = Date.now
@@ -12,7 +13,7 @@ struct DayView: View {
     private let calendar = Calendar.current
     private let tick = Timer.publish(every: 20, on: .main, in: .common).autoconnect()
 
-    private var blocks: [Block] { DayLogic.sorted(Plan.today(on: now, calendar: calendar)) }
+    private var blocks: [Block] { DayLogic.sorted(plan.today(on: now, calendar: calendar)) }
     private var completed: Set<String> { store.completed(on: now) }
     private var doneCount: Int { blocks.filter { completed.contains($0.id) }.count }
 
@@ -46,10 +47,12 @@ struct DayView: View {
                 }
             }
         }
-        .task {
+        .task(id: plan.needsOnboarding) {
+            // Onboarding asks for the permission itself; don't double-prompt behind the cover.
+            guard !plan.needsOnboarding else { return }
             let granted = await NotificationScheduler.requestAuthorization()
             notificationsDenied = !granted
-            await NotificationScheduler.register(Plan.blocks)
+            await NotificationScheduler.register(plan.blocks)
             await autoCompleteFromHealth()
         }
     }
@@ -115,7 +118,7 @@ struct DayView: View {
                     BlockRow(
                         block: block,
                         status: block.status(now: now, completed: completed, calendar: calendar),
-                        subtitle: block.id == Plan.gymBlockID ? Plan.gymSession(on: now, calendar: calendar) : nil,
+                        subtitle: block.note(on: now, calendar: calendar),
                         onToggle: { store.toggle(block.id, on: now) }
                     )
                     if block.id != blocks.last?.id { Divider().padding(.leading, 72) }
@@ -127,7 +130,7 @@ struct DayView: View {
 
     private func refreshNotifications() async {
         notificationsDenied = await NotificationScheduler.isDenied()
-        await NotificationScheduler.register(Plan.blocks)
+        await NotificationScheduler.register(plan.blocks)
     }
 
     /// A run or strength workout in Apple Health today closes the matching blocks.

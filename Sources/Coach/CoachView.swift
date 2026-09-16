@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CoachView: View {
     @Bindable var store: CompletionStore
+    @Bindable var plan: PlanStore
 
     @State private var apiKey: String = APIKeyStore.load() ?? ""
     @State private var editingKey = false
@@ -91,7 +92,7 @@ struct CoachView: View {
         errorText = nil
         defer { isLoading = false }
         let now = Date.now
-        let blocks = DayLogic.sorted(Plan.today(on: now, calendar: calendar))
+        let blocks = DayLogic.sorted(plan.today(on: now, calendar: calendar))
         do {
             let client = CoachClient(apiKey: apiKey)
             answer = try await client.ask(

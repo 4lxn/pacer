@@ -92,12 +92,13 @@ final class StatusLogicTests: XCTestCase {
             XCTAssertNotNil(b.end, b.id)
         }
         // Wednesday 2026-09-16: everything occurs; Sunday 2026-09-20: no work, no gym, no shake.
-        XCTAssertEqual(Plan.today(on: date(2026, 9, 16, 12, 0), calendar: calendar).count, 21)
-        let sunday = Plan.today(on: date(2026, 9, 20, 12, 0), calendar: calendar).map(\.id)
+        XCTAssertEqual(Plan.blocks.filter { $0.occurs(on: date(2026, 9, 16, 12, 0), calendar: calendar) }.count, 21)
+        let sunday = Plan.blocks.filter { $0.occurs(on: date(2026, 9, 20, 12, 0), calendar: calendar) }.map(\.id)
         XCTAssertFalse(sunday.contains("b07"))
         XCTAssertFalse(sunday.contains("b16"))
         XCTAssertTrue(sunday.contains("b14"))
-        XCTAssertEqual(Plan.gymSession(on: date(2026, 9, 16, 12, 0), calendar: calendar), "Upper 2")
-        XCTAssertNil(Plan.gymSession(on: date(2026, 9, 20, 12, 0), calendar: calendar))
+        let gym = Plan.blocks.first { $0.id == "b16" }!
+        XCTAssertEqual(gym.note(on: date(2026, 9, 16, 12, 0), calendar: calendar), "Upper 2")
+        XCTAssertNil(gym.note(on: date(2026, 9, 20, 12, 0), calendar: calendar))
     }
 }
