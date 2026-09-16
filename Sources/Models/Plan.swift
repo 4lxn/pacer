@@ -18,7 +18,7 @@ enum Plan {
         Block(id: "b08", label: "Protein shake", kind: .fixed, start: .hm(11, 30), end: .hm(11, 45)),
         Block(id: "b09", label: "Lunch: beef + rice", kind: .window, start: .hm(13, 0), end: .hm(13, 40)),
         Block(id: "b10", label: "Work block", kind: .fixed, start: .hm(13, 45), end: .hm(15, 30), weekdays: weekdaysMonFri),
-        Block(id: "b11", label: "Study", kind: .fixed, start: .hm(15, 45), end: .hm(17, 15), weekdays: weekdaysMonFri),
+        Block(id: "b11", label: "Study", kind: .fixed, start: .hm(15, 45), end: .hm(17, 15), weekdays: weekdaysMonFri, autoComplete: .study),
         Block(id: "b12", label: "Send one application", kind: .free, weekdays: weekdaysMonFri),
         Block(id: "b13", label: "Leave for training", kind: .fixed, start: .hm(17, 45), end: .hm(17, 55)),
         Block(id: "b14", label: "Run (Garmin Coach)", kind: .window, start: .hm(18, 0), end: .hm(19, 0), weekdays: weekdaysTueSun, autoComplete: .run),

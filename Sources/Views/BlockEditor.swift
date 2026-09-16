@@ -42,10 +42,11 @@ struct BlockEditor: View {
                 }
                 Section {
                     Toggle("Anchor (never droppable, breaks through Focus)", isOn: $block.isAnchor)
-                    Picker("Auto-complete from Health", selection: autoBinding) {
+                    Picker("Auto-complete", selection: autoBinding) {
                         Text("Off").tag("")
                         Text("Run").tag(WorkoutMatch.run.rawValue)
                         Text("Strength").tag(WorkoutMatch.strength.rawValue)
+                        Text("Study session (20+ min)").tag(WorkoutMatch.study.rawValue)
                     }
                 }
                 if !isNew && !block.isAnchor {

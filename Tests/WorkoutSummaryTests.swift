@@ -47,6 +47,15 @@ final class WorkoutSummaryTests: XCTestCase {
     func testPlanAutoCompleteWiring() {
         XCTAssertEqual(Plan.blocks.first { $0.id == "b14" }?.autoComplete, .run)
         XCTAssertEqual(Plan.blocks.first { $0.id == "b16" }?.autoComplete, .strength)
-        XCTAssertEqual(Plan.blocks.filter { $0.autoComplete != nil }.count, 2)
+        XCTAssertEqual(Plan.blocks.first { $0.id == "b11" }?.autoComplete, .study)
+        XCTAssertEqual(Plan.blocks.filter { $0.autoComplete != nil }.count, 3)
+    }
+
+    func testStudyBlockClosesAtTwentyMinutes() {
+        let study = Block(id: "s", label: "Study", kind: .fixed, start: .hm(15, 45), end: .hm(17, 15), autoComplete: .study)
+        let now = date(16, 18)
+        XCTAssertEqual(DayLogic.autoCompletions([study], workouts: [], studyMinutesToday: 19, now: now, completed: [], calendar: calendar), [])
+        XCTAssertEqual(DayLogic.autoCompletions([study], workouts: [], studyMinutesToday: 20, now: now, completed: [], calendar: calendar), ["s"])
+        XCTAssertEqual(DayLogic.autoCompletions([study], workouts: [workout(.run, day: 16)], studyMinutesToday: 0, now: now, completed: [], calendar: calendar), [])
     }
 }
