@@ -8,6 +8,7 @@ struct CoachView: View {
     @Bindable var food: FoodStore
     @Bindable var track: TrackStore
     @Bindable var account: CoachAccount
+    @Bindable var wardrobe: WardrobeStore
 
     @State private var apiKey: String = APIKeyStore.load() ?? ""
     @State private var useOwnKey = CoachClient.proxyURL == nil || APIKeyStore.load() != nil
@@ -182,7 +183,7 @@ struct CoachView: View {
                 staticSystem: CoachProfile.load(),
                 snapshot: CoachContext.snapshot(
                     blocks: blocks, now: now, completed: store.completed(on: now), calendar: calendar,
-                    extra: [health.coachSummary(now: now, calendar: calendar), food.coachSummary(now: now), track.coachSummary(now: now)]
+                    extra: [health.coachSummary(now: now, calendar: calendar), food.coachSummary(now: now), track.coachSummary(now: now), wardrobe.coachSummary()]
                 )
             )
         } catch CoachClient.CoachError.http(401, _) where !useOwnKey {

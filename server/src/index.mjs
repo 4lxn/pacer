@@ -24,7 +24,7 @@ function json(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
-async function readJSON(req, limitBytes = 200_000) {
+async function readJSON(req, limitBytes = 3_000_000) {
   let size = 0;
   const chunks = [];
   for await (const chunk of req) {
@@ -68,6 +68,13 @@ async function handleCoach(req, res) {
   if (!Array.isArray(body.system) || typeof body.question !== "string") {
     return json(res, 400, { error: "system[] and question required" });
   }
+  // Optional photo (wardrobe scanner): { media_type, data (base64) } → image block before the text.
+  const content = body.image && typeof body.image.data === "string"
+    ? [
+        { type: "image", source: { type: "base64", media_type: body.image.media_type || "image/jpeg", data: body.image.data } },
+        { type: "text", text: body.question },
+      ]
+    : body.question;
 
   const upstream = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -79,9 +86,9 @@ async function handleCoach(req, res) {
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: Number(MAX_TOKENS),
+      max_tokens: body.image ? 512 : Number(MAX_TOKENS),
       system: body.system,
-      messages: [{ role: "user", content: body.question }],
+      messages: [{ role: "user", content }],
       fallbacks: "default",
     }),
   });

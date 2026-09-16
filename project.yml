@@ -31,6 +31,8 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Autopiloto
         INFOPLIST_KEY_NSHealthShareUsageDescription: "Autopiloto reads your workouts, weight and steps to close training blocks automatically and show your training week."
         INFOPLIST_KEY_NSHealthUpdateUsageDescription: "Autopiloto saves the weight you log so it shows up in Health and in your other apps."
+        INFOPLIST_KEY_NSCameraUsageDescription: "Photograph a garment to add it to your closet."
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Pick a photo of a garment to add it to your closet."
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1"
     entitlements:

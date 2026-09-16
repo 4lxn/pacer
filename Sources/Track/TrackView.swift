@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct TrackView: View {
+struct TrackContent: View {
     @Bindable var track: TrackStore
     @State private var now = Date.now
     @State private var topic = ""
@@ -12,18 +12,15 @@ struct TrackView: View {
     private var currency: String { Locale.current.currency?.identifier ?? "MXN" }
 
     var body: some View {
-        NavigationStack {
-            List {
-                studySection
-                incomeSection
-            }
-            .navigationTitle("Track")
-            .onReceive(tick) { now = $0 }
-            .onAppear { now = .now }
-            .sheet(isPresented: $addingIncome) { IncomeForm(currency: currency) { track.addIncome(source: $0, amount: $1, on: $2) } }
-            .sheet(isPresented: $editingGoal) {
-                GoalForm(minutes: track.weeklyStudyGoalMinutes) { track.weeklyStudyGoalMinutes = $0 }
-            }
+        List {
+            studySection
+            incomeSection
+        }
+        .onReceive(tick) { now = $0 }
+        .onAppear { now = .now }
+        .sheet(isPresented: $addingIncome) { IncomeForm(currency: currency) { track.addIncome(source: $0, amount: $1, on: $2) } }
+        .sheet(isPresented: $editingGoal) {
+            GoalForm(minutes: track.weeklyStudyGoalMinutes) { track.weeklyStudyGoalMinutes = $0 }
         }
     }
 
