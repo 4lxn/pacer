@@ -43,13 +43,16 @@ final class WardrobeStore {
     var laundry: [Garment] { closet.filter(\.needsWash).sorted { $0.wearsSinceWash > $1.wearsSinceWash } }
 
     func suggestion(now: Date = .now) -> [Garment] {
-        OutfitPicker.pick(from: closet, weather: weather, formality: formality, now: now)
+        let yesterday = outfit(on: calendar.date(byAdding: .day, value: -1, to: now) ?? now) ?? []
+        return OutfitPicker.pick(from: closet, weather: weather, formality: formality, now: now, yesterday: yesterday)
     }
 
-    func todaysOutfit(now: Date = .now) -> [Garment]? {
-        guard let log = outfits.last(where: { calendar.isDate($0.date, inSameDayAs: now) }) else { return nil }
+    func outfit(on day: Date) -> [Garment]? {
+        guard let log = outfits.last(where: { calendar.isDate($0.date, inSameDayAs: day) }) else { return nil }
         return log.garmentIDs.compactMap { id in closet.first { $0.id == id } }
     }
+
+    func todaysOutfit(now: Date = .now) -> [Garment]? { outfit(on: now) }
 
     func add(_ garment: Garment, imageData: Data?) {
         var g = garment
