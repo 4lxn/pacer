@@ -1,12 +1,14 @@
 import Foundation
 import Security
 
-/// Anthropic API key in the Keychain. Never written to disk in plain text, never in the repo.
+/// Secrets in the Keychain (Anthropic API key, Coach session token). Never on disk in plain text.
 enum APIKeyStore {
     private static let service = "com.alan.autopiloto"
-    private static let account = "anthropic-api-key"
+    static let anthropicKey = "anthropic-api-key"
+    static let coachSession = "coach-session-token"
+    static let appleUser = "apple-user-id"
 
-    private static var query: [String: Any] {
+    private static func query(_ account: String) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -14,8 +16,8 @@ enum APIKeyStore {
         ]
     }
 
-    static func load() -> String? {
-        var q = query
+    static func load(_ account: String = anthropicKey) -> String? {
+        var q = query(account)
         q[kSecReturnData as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
         var item: CFTypeRef?
@@ -24,18 +26,18 @@ enum APIKeyStore {
         return String(data: data, encoding: .utf8)
     }
 
-    static func save(_ key: String) {
-        let data = Data(key.utf8)
-        var add = query
+    static func save(_ value: String, account: String = anthropicKey) {
+        let data = Data(value.utf8)
+        var add = query(account)
         add[kSecValueData as String] = data
         add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
         let status = SecItemAdd(add as CFDictionary, nil)
         if status == errSecDuplicateItem {
-            SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+            SecItemUpdate(query(account) as CFDictionary, [kSecValueData as String: data] as CFDictionary)
         }
     }
 
-    static func delete() {
-        SecItemDelete(query as CFDictionary)
+    static func delete(_ account: String = anthropicKey) {
+        SecItemDelete(query(account) as CFDictionary)
     }
 }

@@ -29,6 +29,36 @@ final class CoachClientTests: XCTestCase {
         XCTAssertEqual(messages[0]["content"] as? String, "hola")
     }
 
+    func testProxyRequestShapeAndParse() throws {
+        let request = try CoachClient.makeProxyRequest(
+            base: URL(string: "https://coach.example.com")!, sessionToken: "sess", staticSystem: "STATIC", snapshot: "SNAP", question: "hola"
+        )
+        XCTAssertEqual(request.url?.absoluteString, "https://coach.example.com/v1/coach")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer sess")
+        XCTAssertNil(request.value(forHTTPHeaderField: "x-api-key"))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+        XCTAssertEqual(json["question"] as? String, "hola")
+        XCTAssertEqual((json["system"] as? [[String: Any]])?.count, 2)
+
+        XCTAssertEqual(try CoachClient.parseProxy(Data(#"{"text":"Come arroz.","remaining":39}"#.utf8), status: 200), "Come arroz.")
+        XCTAssertThrowsError(try CoachClient.parseProxy(Data(#"{"error":"daily limit reached"}"#.utf8), status: 429)) { error in
+            XCTAssertEqual(error.localizedDescription, "API error 429: daily limit reached")
+        }
+    }
+
+    @MainActor
+    func testCoachProfileSeedsFromLegacyOrTemplate() throws {
+        let defaults = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
+        let missing = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        XCTAssertEqual(CoachProfile.load(defaults: defaults, legacyMarker: missing), CoachProfile.template)
+        let legacy = FileManager.default.temporaryDirectory.appendingPathComponent("legacy-\(UUID().uuidString)")
+        try Data("{}".utf8).write(to: legacy)
+        let other = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
+        XCTAssertEqual(CoachProfile.load(defaults: other, legacyMarker: legacy), CoachContext.training)
+        CoachProfile.save("mine", defaults: other)
+        XCTAssertEqual(CoachProfile.load(defaults: other, legacyMarker: legacy), "mine")
+    }
+
     func testParseJoinsTextBlocks() throws {
         let data = Data("""
         {"id":"msg_1","type":"message","role":"assistant","content":[{"type":"thinking","thinking":""},{"type":"text","text":"Hola."},{"type":"text","text":"Come arroz."}],"stop_reason":"end_turn"}
