@@ -6,6 +6,7 @@ struct RootView: View {
     @Bindable var health: HealthStore
     @Bindable var food: FoodStore
     @Bindable var track: TrackStore
+    @Bindable var account: CoachAccount
 
     var body: some View {
         TabView {
@@ -17,7 +18,7 @@ struct RootView: View {
                 .tabItem { Label("Food", systemImage: "fork.knife") }
             TrackView(track: track)
                 .tabItem { Label("Track", systemImage: "chart.bar") }
-            CoachView(store: store, plan: plan, health: health, food: food, track: track)
+            CoachView(store: store, plan: plan, health: health, food: food, track: track, account: account)
                 .tabItem { Label("Coach", systemImage: "bubble.left.and.text.bubble.right") }
         }
         .fullScreenCover(isPresented: Binding(get: { plan.needsOnboarding }, set: { _ in })) {

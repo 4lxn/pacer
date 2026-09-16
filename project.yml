@@ -39,6 +39,7 @@ targets:
         com.apple.developer.usernotifications.time-sensitive: true
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access: []
+        com.apple.developer.applesignin: [Default]
   AutopilotoTests:
     type: bundle.unit-test
     platform: iOS
@@ -58,6 +59,7 @@ schemes:
         AutopilotoTests: [test]
     run:
       config: Debug
+      storeKitConfiguration: Autopiloto.storekit
     test:
       config: Debug
       targets:
