@@ -8,7 +8,7 @@ Deferred work with enough context to pick up cold. Effort is human-team → with
   yyyy-MM-dd) and `dayEnd` is clamped to 23:59. Users who sleep after midnight see "Sleep" as
   tomorrow's block. Redefine the day as `[earliest timed start, +24 h)` across `DayLogic`,
   completions, overrides, notifications and the widget. Decided 2026-09-16 (CEO review 9A).
-  Effort: L → M. Blocked by: the Cruise core PR landing first.
+  Effort: L → M. Blocked by: the Pacer core PR landing first.
 - **Anonymous weekly metrics ping** — Decided against for now (CM5): counts without an id
   can't compute D7 retention and would flip the "Analytics: none" privacy story. Reopen when
   there are enough real users for aggregates to mean something. Effort: S → S.

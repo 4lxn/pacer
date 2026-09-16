@@ -1,10 +1,10 @@
-# Cruise (was Autopiloto) — product plan (v1 → store)
+# Pacer (was Autopiloto) — product plan (v1 → store)
 
 _2026-09-16. Owner: Alan. Status: core built, not yet in the store. CEO review done 2026-09-16; next-level plan below._
 
 ## One line
 
-**Cruise — you steer, it keeps the pace.** Cruise runs your day: a timeline of blocks that notifies you when each starts, one tap to
+**Pacer — keeps your day on pace.** Pacer runs your day: a timeline of blocks that notifies you when each starts, one tap to
 confirm from the lock screen, blocks that close themselves from Apple Health, and a coach that
 knows your plan and your body — and can change any of it by chat.
 
@@ -81,7 +81,7 @@ Full record with every decision: `~/.gstack/projects/4lxn-autopiloto/ceo-plans/2
 | PR2 | `Replanner` (pure) + `DayOverrides` + Undo + `DayMutator` + `REPLAN` action + Replan/Skip on missed rows + coach `move_today` / `skip_today` / `undo_replan` | Keep Replan only if ≥ 30 % of eligible check-ins choose Replan and ≥ 70 % are not undone after 2 weeks with ≥ 5 testers |
 | PR3 | App Group (`defaultURL` change, no migration code) + Now/Next widget (systemSmall) sharing `Models/` + `DayLogic` | — |
 | PR4 | HealthKit background delivery + Settings sheet + Diagnostics ("Copy report") + "Your week" (on-device only) | — |
-| PR5 | Rename to **Cruise** after checking App Store name availability (own PR) + `docs/ARCHITECTURE.md` | — |
+| PR5 | Rename to **Pacer** after checking App Store name availability (own PR) + `docs/ARCHITECTURE.md` | — |
 
 ## NOT in scope (this round)
 - Wake-relative day model for shift workers — calendar day only; `dayEnd` ≤ 23:59 (9A)
@@ -111,7 +111,7 @@ Full record with every decision: `~/.gstack/projects/4lxn-autopiloto/ceo-plans/2
 | HK enableBackgroundDelivery | throws / denied | HKError | Y | log; check-ins still fire |
 | HK observer handler | refresh throws | HKError | Y | log; completion handler always called |
 | BGAppRefresh | expires | — | Y | `setTaskCompleted(false)` |
-| Widget provider | JSON unreadable | DecodingError | Y | "Open Cruise" placeholder |
+| Widget provider | JSON unreadable | DecodingError | Y | "Open Pacer" placeholder |
 
 ## Failure modes registry
 | Codepath | Failure | Rescued | Test | User sees | Logged |
@@ -200,7 +200,7 @@ Synthesized from this review's findings. Each task derives from a specific findi
   - Surfaced by: D5.1, 8A, CM5, spec round 2 #17, outside voice #14
   - Files: project.yml, Sources/AutopilotoApp.swift, Sources/Health/HealthStore.swift, Sources/Metrics/MetricsStore.swift, Views/SettingsView.swift, DiagnosticsView.swift
   - Verify: on device — Garmin run closes Run at first unlock; Diagnostics shows counts
-- [ ] **T8 (P3, human: ~half day / CC: ~30 min)** — PR5 name + docs — Check "Cruise" availability in App Store Connect, rename display/App Store name/README/docs (bundle id unchanged), `docs/ARCHITECTURE.md` with the diagrams above, update README notification/network claims and the simctl payload
+- [ ] **T8 (P3, human: ~half day / CC: ~30 min)** — PR5 name + docs — Check "Pacer" availability in App Store Connect, rename display/App Store name/README/docs (bundle id unchanged), `docs/ARCHITECTURE.md` with the diagrams above, update README notification/network claims and the simctl payload
   - Surfaced by: naming decision, TODO-1, spec round 3 #12, outside voice #9
   - Files: project.yml, README.md, docs/*
   - Verify: `grep -ri autopiloto README.md docs/` returns only historical mentions
