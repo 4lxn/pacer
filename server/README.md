@@ -27,8 +27,10 @@ cd server && npm test
 ANTHROPIC_API_KEY=… SESSION_SECRET=… npm start
 ```
 
-Deploy: Railway → new service from this repo, root directory `server`, add the two required env
-vars, generate a domain. Put the `https://…` URL in `CoachClient.proxyURL` in the app.
+Deployed: Railway project `autopiloto-coach`, service `coach` (root `server`, branch `main`,
+healthcheck `/health`), domain `https://coach-production-94d9.up.railway.app`, wired into
+`CoachClient.proxyURL`. Redeploys on every push to `main` that touches `server/`. Set
+`ANTHROPIC_API_KEY` in the Railway dashboard (never in the repo).
 
 Known ceiling (`ponytail:` in code): the daily limiter is in memory and resets on redeploy; the
 subscription is trusted from the client. Upgrade path: SQLite on a volume for counts and App Store

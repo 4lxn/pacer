@@ -6,7 +6,7 @@ struct CoachClient: Sendable {
     static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
     static let defaultModel = "claude-opus-5"
     /// Set after deploying `server/` (e.g. https://autopiloto-coach.up.railway.app). nil = own-key only.
-    static let proxyURL: URL? = nil
+    static let proxyURL: URL? = URL(string: "https://coach-production-94d9.up.railway.app")
 
     enum Auth: Sendable {
         case apiKey(String)
