@@ -9,6 +9,7 @@ struct DayView: View {
     @State private var now = Date.now
     @State private var notificationsDenied = false
     @State private var bannerDismissed = false
+    @State private var editingPlan = false
 
     private let calendar = Calendar.current
     private let tick = Timer.publish(every: 20, on: .main, in: .common).autoconnect()
@@ -47,6 +48,7 @@ struct DayView: View {
                 }
             }
         }
+        .sheet(isPresented: $editingPlan) { PlanView(plan: plan) }
         .task(id: plan.needsOnboarding) {
             // Onboarding asks for the permission itself; don't double-prompt behind the cover.
             guard !plan.needsOnboarding else { return }
@@ -68,6 +70,13 @@ struct DayView: View {
                     .monospacedDigit()
             }
             Spacer()
+            Button {
+                editingPlan = true
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+            }
+            .buttonStyle(.bordered)
+            .accessibilityLabel("Edit plan")
         }
     }
 

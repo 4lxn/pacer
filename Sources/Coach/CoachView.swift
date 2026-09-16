@@ -3,6 +3,8 @@ import SwiftUI
 struct CoachView: View {
     @Bindable var store: CompletionStore
     @Bindable var plan: PlanStore
+    @Bindable var health: HealthStore
+    @Bindable var food: FoodStore
 
     @State private var apiKey: String = APIKeyStore.load() ?? ""
     @State private var editingKey = false
@@ -98,7 +100,10 @@ struct CoachView: View {
             answer = try await client.ask(
                 q,
                 staticSystem: CoachContext.training,
-                snapshot: CoachContext.snapshot(blocks: blocks, now: now, completed: store.completed(on: now), calendar: calendar)
+                snapshot: CoachContext.snapshot(
+                    blocks: blocks, now: now, completed: store.completed(on: now), calendar: calendar,
+                    extra: [health.coachSummary(now: now, calendar: calendar), food.coachSummary(now: now)]
+                )
             )
         } catch {
             errorText = error.localizedDescription
