@@ -229,10 +229,11 @@ struct CoachView: View {
 
     private func systemBlocks() -> [[String: Any]] {
         let now = Date.now
-        let blocks = DayLogic.sorted(plan.today(on: now, calendar: calendar))
+        let mutator = agent.tools.mutator
+        let blocks = DayLogic.sorted(mutator.effectivePlan(on: now))   // today's overrides included
         let snapshot = CoachContext.snapshot(
             blocks: blocks, now: now, completed: store.completed(on: now), calendar: calendar,
-            extra: [health.coachSummary(now: now, calendar: calendar), food.coachSummary(now: now), track.coachSummary(now: now), wardrobe.coachSummary()]
+            extra: [mutator.days.places.coachSummary(), health.coachSummary(now: now, calendar: calendar), food.coachSummary(now: now), track.coachSummary(now: now), wardrobe.coachSummary()]
         )
         return [
             ["type": "text", "text": CoachProfile.load() + CoachContext.agentRules, "cache_control": ["type": "ephemeral"]],

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PlanView: View {
     @Bindable var plan: PlanStore
+    var places: [Place] = [.home]
     @State private var editing: Block?
     @State private var adding = false
 
@@ -23,10 +24,10 @@ struct PlanView: View {
                 Button { adding = true } label: { Label("Add block", systemImage: "plus") }
             }
             .sheet(item: $editing) { block in
-                BlockEditor(block: block, isNew: false) { plan.upsert($0) } onDelete: { plan.delete(id: $0) }
+                BlockEditor(block: block, isNew: false, places: places) { plan.upsert($0) } onDelete: { plan.delete(id: $0) }
             }
             .sheet(isPresented: $adding) {
-                BlockEditor(block: Block(id: UUID().uuidString, label: "", kind: .window, start: .hm(12, 0), end: .hm(12, 30)), isNew: true) { plan.upsert($0) } onDelete: { _ in }
+                BlockEditor(block: Block(id: UUID().uuidString, label: "", kind: .window, start: .hm(12, 0), end: .hm(12, 30)), isNew: true, places: places) { plan.upsert($0) } onDelete: { _ in }
             }
         }
     }

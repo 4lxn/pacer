@@ -3,6 +3,7 @@ import SwiftUI
 struct BlockEditor: View {
     @State var block: Block
     let isNew: Bool
+    var places: [Place] = [.home]
     let onSave: (Block) -> Void
     let onDelete: (String) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -26,6 +27,12 @@ struct BlockEditor: View {
                         DatePicker("End", selection: endBinding, displayedComponents: .hourAndMinute)
                     }
                 }
+                Section {
+                    Picker("Place", selection: Binding(get: { block.place ?? "" }, set: { block.place = $0.isEmpty ? nil : $0 })) {
+                        Text("Wherever I am").tag("")
+                        ForEach(places) { Text($0.name).tag($0.id) }
+                    }
+                } footer: { Text("Travel time to and from the place is kept free around the block. Add places in Settings.") }
                 Section("Days") {
                     HStack {
                         ForEach(Weekdays.all, id: \.self) { day in

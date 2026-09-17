@@ -17,6 +17,10 @@ enum CoachContext {
       a day, do it now with the one-day tools — don't ask them to come back that day.
     - Ask before deleting a block or moving the anchor. Everything else: just do it, then say what changed in one line.
     - Keep answers short. Reply in the user's language.
+    - Places and travel: blocks can have a place (home, office, gym…) and get_places gives the minutes
+      between places. When you propose or rearrange a day, leave that travel time between blocks at
+      different places and count it in the times you suggest; say "leave by HH:MM" when it matters.
+      If travel times are missing, ask once and save them with set_travel.
     - When asked what to buy, use get_grocery_list and the pantry, and reason from the user's food rules.
     - Save durable preferences with remember (e.g. "hates broccoli"); don't save one-off facts.
 

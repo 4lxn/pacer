@@ -32,6 +32,7 @@ plan.json (weekly template)      overrides.json (today's moves)
   through `DayMutator`. It records undo, writes the stores, counts the event, then queues the
   notification work (`rearm()`), which notification actions `flush()` before returning so iOS
   doesn't suspend the process mid-way.
+- **Places.** A block can have a place; `Places` holds door-to-door minutes between pairs. Free gaps shrink by the travel from the previous obstacle and to the next; `place` rejects a time with no room for the commute; `DayLogic.travelLegs` drives the "leave by" hints and the one-shot `leave-<id>-<day>` reminders.
 - **Replanner** is pure: obstacles = fixed blocks not done, the current window, done blocks; the
   block goes in the first free gap ≥ its length after `max(now, end)`, else shrinks into the largest
   gap ≥ 20 min, else "no room" (skipped today, undoable). Later windows cascade forward and drop
@@ -45,6 +46,7 @@ plan.json (weekly template)      overrides.json (today's moves)
 | Snooze | `<blockId>-snooze` | +10 min | `BLOCK_ACTIONS` |
 | Check-in | `checkin-<blockId>-<dayKey>` | end + 5 min, today + tomorrow | `CHECK_IN`: Done, Move it later, Skip today |
 | Moved start | `moved-<blockId>-<dayKey>` | new start, one-shot | `BLOCK_ACTIONS` |
+| Leave | `leave-<blockId>-<dayKey>` | start − travel, one-shot | — |
 | Replan result | `replan-<uuid>` | immediate (only from a notification action) | `REPLAN_UNDO`: Undo |
 
 Repeating starts survive force-quit; one-shots are re-armed after every mutation, on foreground, by
@@ -63,7 +65,7 @@ disk path: atomic writes, undecodable files renamed `.bad`, every failure into `
 |---|---|---|
 | `plan.json` | `PlanStore` | `[Block]` |
 | `completions.json` | `CompletionStore` | `[dayKey: {done, skipped}]` |
-| `overrides.json`, `undo.json`, `settings.json` | `DayStore` | moves per day, one `UndoRecord`, `{dayEnd, checkInsEnabled}` |
+| `overrides.json`, `undo.json`, `settings.json`, `places.json` | `DayStore` | moves / one-offs / notes per day, one `UndoRecord`, `{dayEnd, checkInsEnabled}`, places + travel minutes |
 | `metrics.json` | `MetricsStore` | counters per day + timestamps (device only) |
 | `food.json`, `track.json`, `wardrobe.json`, `chat.json` | Food / Track / Wardrobe / CoachChat | — |
 

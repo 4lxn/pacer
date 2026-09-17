@@ -24,6 +24,9 @@ struct SettingsView: View {
                 Section {
                     DatePicker("Day ends at", selection: dayEnd, displayedComponents: .hourAndMinute)
                     Toggle("End-of-block check-ins", isOn: $days.checkInsEnabled)
+                    NavigationLink { PlacesView(days: days) } label: {
+                        LabeledContent("Places & travel", value: "\(days.places.list.count)")
+                    }
                 } header: { Text("Day") } footer: {
                     Text("A moved block is never placed after the day end. Check-ins ask “Did it happen?” five minutes after a block ends; you can also turn them off per block.")
                 }

@@ -142,6 +142,7 @@ struct DayPlanView: View {
     private var blocks: [Block] { DayLogic.sorted(mutator.effectivePlan(on: date)) }
     private var override: DayOverride { mutator.days.override(dayKey: dayKey) }
     private var isToday: Bool { calendar.isDate(date, inSameDayAs: now) }
+    private var legs: [String: (minutes: Int, from: String)] { DayLogic.travelLegs(blocks, places: mutator.days.places) }
 
     var body: some View {
         List {
@@ -169,8 +170,11 @@ struct DayPlanView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(block.label).strikethrough(status == .done || status == .skipped)
                                     .foregroundStyle(status == .done || status == .skipped ? Color.secondary : Color.primary)
-                                if let note = override.notes[block.id] ?? block.note(on: date, calendar: calendar) {
-                                    Text(note).font(.caption).foregroundStyle(.secondary)
+                                let sub = [mutator.days.places.name(id: block.place), override.notes[block.id] ?? block.note(on: date, calendar: calendar)].compactMap { $0 }
+                                if !sub.isEmpty { Text(sub.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary) }
+                                if let leg = legs[block.id] {
+                                    Text("\(leg.minutes) min from \(leg.from) · leave by \(block.start.map { DayLogic.clock(DayLogic.components(minutes: DayLogic.minutes($0) - leg.minutes)) } ?? "")")
+                                        .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
                                 }
                             }
                             Spacer()
@@ -201,7 +205,7 @@ struct DayPlanView: View {
             BlockDetailSheet(block: block, now: clock, mutator: mutator) { editingBlock = $0 }
         }
         .sheet(item: $editingBlock) { block in
-            BlockEditor(block: plan.block(id: block.id) ?? block, isNew: false) { plan.upsert($0) } onDelete: { plan.delete(id: $0) }
+            BlockEditor(block: plan.block(id: block.id) ?? block, isNew: false, places: mutator.days.places.list) { plan.upsert($0) } onDelete: { plan.delete(id: $0) }
         }
         .sheet(isPresented: $adding) { TodayOnlySheet(now: clock) { mutator.addExtra($0, dayKey: dayKey) } }
         .animation(.snappy, value: override)
