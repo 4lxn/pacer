@@ -15,6 +15,8 @@ struct BlockDetailSheet: View {
 
     private var calendar: Calendar { mutator.calendar }
     private var dayKey: String { mutator.dayKey(now) }
+    private var isToday: Bool { calendar.isDate(now, inSameDayAs: mutator.now()) }
+    private var dayWord: String { isToday ? "today" : now.formatted(.dateTime.weekday(.abbreviated).day()) }
     private var status: BlockStatus {
         block.status(now: now, completed: mutator.completions.completed(dayKey: dayKey), skipped: mutator.completions.skipped(dayKey: dayKey), calendar: calendar)
     }
@@ -67,7 +69,7 @@ struct BlockDetailSheet: View {
                     }
                 }
 
-                Section("Note for today") {
+                Section(isToday ? "Note for today" : "Note for \(dayWord)") {
                     TextField("What to do in this block…", text: $note, axis: .vertical)
                         .lineLimit(1...4)
                         .focused($noteFocused)
@@ -80,20 +82,20 @@ struct BlockDetailSheet: View {
                     } else {
                         Button("Done", systemImage: "checkmark.circle.fill") { mutator.setDone(block.id, true, dayKey: dayKey); dismiss() }
                     }
-                    if canMove {
-                        Button("Move it later today", systemImage: "arrow.right.circle") { mutator.replan(block.id, on: now); dismiss() }
-                        Button("Set today's time…", systemImage: "clock") { editingTime = true }
+                    if canMove && mutator.isEditable(now) {
+                        if isToday { Button("Move it later today", systemImage: "arrow.right.circle") { mutator.replan(block.id, on: now); dismiss() } }
+                        Button(isToday ? "Set today's time…" : "Set the time for \(dayWord)…", systemImage: "clock") { editingTime = true }
                     }
                     if status == .skipped {
-                        Button("Back on today's plan", systemImage: "arrow.uturn.backward") { mutator.unskip(block.id, on: now); dismiss() }
+                        Button(isToday ? "Back on today's plan" : "Back on the plan for \(dayWord)", systemImage: "arrow.uturn.backward") { mutator.unskip(block.id, on: now); dismiss() }
                     } else if status != .done {
-                        Button("Skip today", systemImage: "minus.circle") { mutator.skipToday(block.id, dayKey: dayKey); dismiss() }
+                        Button(isToday ? "Skip today" : "Skip on \(dayWord)", systemImage: "minus.circle") { mutator.skipToday(block.id, dayKey: dayKey); dismiss() }
                     }
                 }
 
                 Section {
                     if isExtra {
-                        Button("Remove from today", systemImage: "trash", role: .destructive) { mutator.removeExtra(block.id, dayKey: dayKey); dismiss() }
+                        Button(isToday ? "Remove from today" : "Remove from \(dayWord)", systemImage: "trash", role: .destructive) { mutator.removeExtra(block.id, dayKey: dayKey); dismiss() }
                     } else {
                         Button("Edit in the weekly plan", systemImage: "slider.horizontal.3") { onEditPlan(block); dismiss() }
                     }
@@ -118,7 +120,7 @@ struct BlockDetailSheet: View {
                 DatePicker("End", selection: $end, displayedComponents: .hourAndMinute)
                 if let change = mutator.lastChange, !change.undoable { Text(change.summary).foregroundStyle(.red) }
             }
-            .navigationTitle("Today's time").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(isToday ? "Today's time" : "Time on \(dayWord)").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { editingTime = false } }
                 ToolbarItem(placement: .confirmationAction) {

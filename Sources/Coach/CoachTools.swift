@@ -25,15 +25,18 @@ struct CoachTools {
 
     static let definitions: [[String: Any]] = [
         // Plan
-        tool("get_plan", "Today's blocks with ids, times and status (done, current, upcoming, missed, skipped). Blocks moved for today only are marked 'moved'.", [:]),
+        tool("get_plan", "A day's blocks with ids, times and status (done, current, upcoming, missed, skipped). Today by default; pass date for another day. Moved / one-off blocks and notes are marked.", [
+            "date": str("YYYY-MM-DD, or 'tomorrow'; omit for today"),
+        ]),
         tool("add_block", "Add a block to the weekly plan, or with today_only=true a one-off block for today only (the plan is unchanged). Times are HH:MM 24h. kind: fixed (notifies at start), window (anytime in range), free (no clock).", [
             "label": str("Short label"), "kind": enumOf(["fixed", "window", "free"]),
             "start": str("HH:MM, omit for free"), "end": str("HH:MM, omit for free"),
             "weekdays": ["type": "array", "items": ["type": "integer"], "description": "1=Sunday…7=Saturday; omit for every day"],
-            "today_only": ["type": "boolean", "description": "true = just for today"],
+            "today_only": ["type": "boolean", "description": "true = a one-off block for one day only (today, or `date`)"],
+            "date": str("YYYY-MM-DD or 'tomorrow' for the one-off day; omit for today"),
         ], required: ["label", "kind"]),
-        tool("set_block_note", "Attach a short note to a block for today only (e.g. what to do in that block). Empty note removes it.", [
-            "id": str("Block id"), "note": str("The note"),
+        tool("set_block_note", "Attach a short note to a block for one day (e.g. what to do in that block). Empty note removes it.", [
+            "id": str("Block id"), "note": str("The note"), "date": str("YYYY-MM-DD or 'tomorrow'; omit for today"),
         ], required: ["id", "note"]),
         tool("update_block", "Change a block's label, times, kind or weekdays. Only pass the fields to change.", [
             "id": str("Block id from get_plan"), "label": str(""), "kind": enumOf(["fixed", "window", "free"]),
@@ -46,13 +49,16 @@ struct CoachTools {
         tool("mark_done", "Mark a block done for today (or undo with done=false).", [
             "id": str("Block id"), "done": ["type": "boolean", "description": "default true"],
         ], required: ["id"]),
-        tool("skip_today", "Skip a block for today only (it leaves today's count; the plan is unchanged). undo=true puts it back.", [
-            "id": str("Block id"), "undo": ["type": "boolean"],
+        tool("skip_today", "Skip a block on one day only (today or `date`; the plan is unchanged). undo=true puts it back.", [
+            "id": str("Block id"), "undo": ["type": "boolean"], "date": str("YYYY-MM-DD or 'tomorrow'; omit for today"),
         ], required: ["id"]),
-        tool("move_today", "Move a missed or upcoming block to later TODAY only (the weekly plan is unchanged). Omit start to let the app find the first free slot after now; pass start (HH:MM) to place it there. Later windows are pushed forward if needed. Use update_block instead to change the plan permanently.", [
-            "id": str("Block id"), "start": str("HH:MM; omit for the first free slot"),
+        tool("move_today", "Move a block on ONE day only — today or any future `date` (the weekly plan is unchanged). Pass start (HH:MM) to place it there; omit start to find the first free slot (after now when today). Later windows are pushed forward if needed. To rebuild a whole day, call this once per block. Use update_block to change the plan permanently.", [
+            "id": str("Block id"), "start": str("HH:MM; omit for the first free slot"), "date": str("YYYY-MM-DD or 'tomorrow'; omit for today"),
         ], required: ["id"]),
-        tool("undo_replan", "Undo the last move_today or skip_today made today.", [:]),
+        tool("undo_replan", "Undo the last move_today / skip_today / day reset.", [:]),
+        tool("reset_day", "Drop every one-day change on a date (moves, one-off blocks, notes) so it follows the weekly plan again.", [
+            "date": str("YYYY-MM-DD or 'tomorrow'; omit for today"),
+        ]),
         // Food
         tool("get_pantry", "Pantry items with quantity, unit and minimum; items below minimum are on the grocery list.", [:]),
         tool("add_pantry_item", "Add a pantry item, or set quantity/unit/minimum of an existing one with the same name.", [
@@ -139,18 +145,32 @@ struct CoachTools {
 
     // MARK: - Execution
 
+    /// `date` input → a Date at noon; today when absent. nil = unparsable.
+    func day(_ v: Any?) -> Date? {
+        guard let raw = v as? String, !raw.isEmpty else { return now() }
+        switch raw.lowercased() {
+        case "today": return now()
+        case "tomorrow": return calendar.date(byAdding: .day, value: 1, to: now())
+        default: return mutator.date(raw)
+        }
+    }
+
     func run(name: String, input: [String: Any]) -> Result {
         let today = now()
+        guard let day = day(input["date"]) else { return Result(output: "date must be YYYY-MM-DD or 'tomorrow'", isError: true) }
+        let dayKey = mutator.dayKey(day)
+        let isToday = calendar.isDate(day, inSameDayAs: today)
         switch name {
         case "get_plan":
-            let blocks = DayLogic.sorted(mutator.effectivePlan(on: today))
-            let completed = completions.completed(on: today)
-            let skipped = completions.skipped(on: today)
-            let override = mutator.days.override(dayKey: mutator.dayKey(today))
+            let clock = mutator.clock(for: day)
+            let blocks = DayLogic.sorted(mutator.effectivePlan(on: day))
+            let completed = completions.completed(dayKey: dayKey)
+            let skipped = completions.skipped(dayKey: dayKey)
+            let override = mutator.days.override(dayKey: dayKey)
             let extras = Set(override.extras.map(\.id))
             let lines = blocks.map { b -> String in
                 let time = b.start.map { NotificationScheduler.clock($0) + "–" + NotificationScheduler.clock(b.end ?? $0) } ?? "anytime"
-                let status = b.status(now: today, completed: completed, skipped: skipped, calendar: calendar)
+                let status = b.status(now: clock, completed: completed, skipped: skipped, calendar: calendar)
                 var line = "\(b.id) | \(time) | \(b.label) | \(b.kind.rawValue) | \(status)"
                 if b.isAnchor { line += " | anchor" }
                 if override.moved[b.id] != nil { line += " | moved" }
@@ -158,7 +178,7 @@ struct CoachTools {
                 if let note = override.notes[b.id] { line += " | note: \(note)" }
                 return line
             }
-            return Result(output: lines.isEmpty ? "No blocks today." : lines.joined(separator: "\n"))
+            return Result(output: lines.isEmpty ? "No blocks on \(dayKey)." : "\(dayKey)\n" + lines.joined(separator: "\n"))
 
         case "add_block":
             guard let label = input["label"] as? String, let kindRaw = input["kind"] as? String, let kind = BlockKind(rawValue: kindRaw) else {
@@ -173,10 +193,10 @@ struct CoachTools {
                 block.checkIn = Block.defaultCheckIn(kind: kind, start: start, end: end, isAnchor: false)
             }
             block.weekdays = Self.weekdays(input["weekdays"])
-            if input["today_only"] as? Bool == true {
+            if input["today_only"] as? Bool == true || input["date"] != nil {
                 block.weekdays = nil
-                mutator.addExtra(block, dayKey: mutator.dayKey(today))
-                return Result(output: "Added \(block.label) for today only (\(block.id))", summary: "Added \(block.label) for today")
+                mutator.addExtra(block, dayKey: dayKey)
+                return Result(output: "Added \(block.label) on \(dayKey) only (\(block.id))", summary: "Added \(block.label) for \(isToday ? "today" : dayKey)")
             }
             plan.upsert(block)
             return Result(output: "Added block \(block.id): \(label)", summary: "Added block “\(label)”")
@@ -211,29 +231,34 @@ struct CoachTools {
             return Result(output: "\(block.label) is now \(done ? "done" : "not done")", summary: "\(done ? "Done" : "Undone"): \(block.label)")
 
         case "skip_today":
-            guard let id = input["id"] as? String, let block = plan.block(id: id) else { return Result(output: "No block with that id", isError: true) }
+            guard let id = input["id"] as? String, let block = mutator.block(id: id, on: day) else { return Result(output: "No block with that id on \(dayKey)", isError: true) }
             if input["undo"] as? Bool == true {
-                mutator.unskip(id, on: today)
-                return Result(output: "\(block.label) is back on today's plan", summary: "Unskipped \(block.label)")
+                mutator.unskip(id, on: day)
+                return Result(output: "\(block.label) is back on \(dayKey)", summary: "Unskipped \(block.label)")
             }
-            mutator.skipToday(id, dayKey: mutator.dayKey(today))
-            return Result(output: "Skipped \(block.label) for today", summary: "Skipped \(block.label) today")
+            mutator.skipToday(id, dayKey: dayKey)
+            return Result(output: "Skipped \(block.label) on \(dayKey)", summary: "Skipped \(block.label) \(isToday ? "today" : dayKey)")
 
         case "set_block_note":
-            guard let id = input["id"] as? String, let block = mutator.block(id: id, on: today) else { return Result(output: "No block with that id today", isError: true) }
+            guard let id = input["id"] as? String, let block = mutator.block(id: id, on: day) else { return Result(output: "No block with that id on \(dayKey)", isError: true) }
             let note = input["note"] as? String ?? ""
-            mutator.days.setNote(note, blockID: id, dayKey: mutator.dayKey(today))
+            mutator.days.setNote(note, blockID: id, dayKey: dayKey)
             return Result(output: note.isEmpty ? "Note removed from \(block.label)" : "Note set on \(block.label)", summary: note.isEmpty ? "Note removed: \(block.label)" : "Note: \(block.label)")
 
         case "move_today":
-            guard let id = input["id"] as? String, plan.block(id: id) != nil else { return Result(output: "No block with that id", isError: true) }
+            guard let id = input["id"] as? String, mutator.block(id: id, on: day) != nil else { return Result(output: "No block with that id on \(dayKey)", isError: true) }
+            guard mutator.isEditable(day) else { return Result(output: "That day already passed", isError: true) }
             let outcome: Replanner.Outcome
-            if let start = Self.hm(input["start"]) { outcome = mutator.move(id, to: start, on: today) } else { outcome = mutator.replan(id, on: today) }
+            if let start = Self.hm(input["start"]) { outcome = mutator.move(id, to: start, on: day) } else { outcome = mutator.replan(id, on: day) }
             switch outcome {
             case .rejected(let reason): return Result(output: reason, isError: true)
             case .noRoom: return Result(output: mutator.lastChange?.summary ?? "No room today", summary: mutator.lastChange?.summary)
             default: return Result(output: mutator.lastChange?.summary ?? "Moved", summary: mutator.lastChange?.summary)
             }
+
+        case "reset_day":
+            mutator.resetDay(day)
+            return Result(output: "\(dayKey) follows the weekly plan again", summary: "Reset \(isToday ? "today" : dayKey)")
 
         case "undo_replan":
             let summary = mutator.days.undo?.summary

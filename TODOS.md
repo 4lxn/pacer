@@ -4,6 +4,11 @@ Deferred work with enough context to pick up cold. Effort is human-team → with
 
 ## P2
 
+- **Moved/one-off notifications beyond tomorrow** — `rearmCheckIns` covers today + tomorrow, so a
+  block moved for the day after tomorrow gets its one-shot start only once that day is within the
+  window (app open, BG refresh, or a notification action). Extend `checkInDays` or arm on edit.
+  Effort: S → S.
+
 - **Wake-relative day model (shift workers)** — Today the day is the calendar day (`dayKey`
   yyyy-MM-dd) and `dayEnd` is clamped to 23:59. Users who sleep after midnight see "Sleep" as
   tomorrow's block. Redefine the day as `[earliest timed start, +24 h)` across `DayLogic`,
