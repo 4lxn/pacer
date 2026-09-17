@@ -25,6 +25,26 @@ struct RootView: View {
     }
 
     var body: some View {
+        #if DEBUG
+        if let mode = CoachAccount.screenshotMode, mode.hasPrefix("widgets") {
+            WidgetGallery(entry: Entry(date: .now, snapshot: Self.gallerySnapshot(plan: plan, store: store, days: days, mutator: mutator)), page: mode == "widgets2" ? 2 : 1)
+        } else {
+            tabs
+        }
+        #else
+        tabs
+        #endif
+    }
+
+    #if DEBUG
+    @MainActor
+    private static func gallerySnapshot(plan: PlanStore, store: CompletionStore, days: DayStore, mutator: DayMutator) -> DayTimeline.Snapshot {
+        let now = Date.now
+        return DayTimeline.snapshot(at: now, blocks: mutator.effectivePlan(on: now), completed: store.completed(on: now), skipped: store.skipped(on: now), hasPlan: !plan.needsOnboarding, calendar: .current)
+    }
+    #endif
+
+    private var tabs: some View {
         TabView(selection: $selectedTab) {
             DayView(store: store, plan: plan, days: days, mutator: mutator, metrics: metrics, health: health, track: track, account: account)
                 .tabItem { Label("Today", systemImage: "sun.max") }.tag("today")

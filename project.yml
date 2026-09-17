@@ -21,6 +21,7 @@ targets:
     sources:
       - path: Sources
       - path: Assets.xcassets
+      - path: Widget/WidgetViews.swift   # debug widget gallery renders the real widget views
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alan.autopiloto

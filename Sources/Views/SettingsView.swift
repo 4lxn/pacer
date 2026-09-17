@@ -61,6 +61,7 @@ struct SettingsView: View {
 
                 Section {
                     Label("Now / Next — Home Screen, small · medium · large", systemImage: "square.grid.2x2")
+                    Label("Today's plan — Home Screen, medium · large", systemImage: "list.bullet.rectangle")
                     Label("Now / Next — Lock Screen, rectangular · inline", systemImage: "lock.rectangle")
                     Label("Day progress — Lock Screen circular · Home Screen small", systemImage: "circle.dotted.circle")
                 } header: { Text("Widgets") } footer: {

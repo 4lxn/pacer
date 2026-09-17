@@ -17,6 +17,10 @@ enum DayTimeline {
         var total: Int
         /// What comes after the current block (or after now), soonest first; for medium/large widgets.
         var upcoming: [Block] = []
+        /// The whole day, in start order, with what's done / skipped — for the day-list widget.
+        var blocks: [Block] = []
+        var completed: Set<String> = []
+        var skipped: Set<String> = []
     }
 
     /// The state at `date`. `blocks` is that day's effective plan.
@@ -37,7 +41,8 @@ enum DayTimeline {
         }
         let currentID: String? = { if case .now(let b, _) = state { return b.id } else { return nil } }()
         let upcoming = DayLogic.sorted(blocks).filter { $0.id != currentID && $0.status(now: date, completed: completed, skipped: skipped, calendar: calendar) == .upcoming }
-        return Snapshot(date: date, state: state, done: done, total: counted.count, upcoming: Array(upcoming.prefix(6)))
+        return Snapshot(date: date, state: state, done: done, total: counted.count, upcoming: Array(upcoming.prefix(6)),
+                        blocks: DayLogic.sorted(blocks), completed: completed, skipped: skipped)
     }
 
     /// One snapshot now, then one at every block start/end over the next `days` days (plus each
