@@ -55,7 +55,10 @@ struct RootView: View {
         }
         .tabBarMinimizeBehavior(.onScrollDown)
         .fullScreenCover(isPresented: Binding(get: { plan.needsOnboarding }, set: { _ in })) {
-            OnboardingView { blocks, dayEnd, picked in plan.replace(with: blocks); days.dayEnd = dayEnd; sections.replace(picked) }
+            OnboardingView { blocks, dayEnd, picked, home in
+                plan.replace(with: blocks); days.dayEnd = dayEnd; sections.replace(picked)
+                if let home { days.places.upsert(home) }
+            }
         }
         .onChange(of: plan.blocks) { _, blocks in
             WidgetCenter.shared.reloadAllTimelines()
