@@ -34,7 +34,7 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "9"
+        CURRENT_PROJECT_VERSION: "10"
         CODE_SIGN_ENTITLEMENTS: Autopiloto.entitlements
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
@@ -43,6 +43,7 @@ targets:
         INFOPLIST_KEY_NSHealthUpdateUsageDescription: "Pacer saves the weight you log so it shows up in Health and in your other apps."
         INFOPLIST_KEY_NSCameraUsageDescription: "Photograph a garment to add it to your closet."
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Pick a photo of a garment to add it to your closet."
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Pacer uses your location only when you tap 'Use my current location' to pin a place. It is never tracked or sent anywhere."
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1"
     dependencies:
@@ -90,7 +91,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Pacer
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "9"
+        CURRENT_PROJECT_VERSION: "10"
         CODE_SIGN_ENTITLEMENTS: AutopilotoWidget.entitlements
         TARGETED_DEVICE_FAMILY: "1"
     info:

@@ -10,6 +10,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var editingProfile = false
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
+    @State private var showPlaces = false
 
     private var dayEnd: Binding<Date> {
         Binding(
@@ -87,6 +88,12 @@ struct SettingsView: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .sheet(isPresented: $editingProfile) { ProfileEditor() }
             .task { notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus }
+            .navigationDestination(isPresented: $showPlaces) { PlacesView(days: days) }
+            .onAppear {
+                #if DEBUG
+                if CoachAccount.screenshotMode == "places" { showPlaces = true }
+                #endif
+            }
             .onChange(of: days.sound) { _, sound in
                 NotificationScheduler.soundName = sound == "pacer" ? "pacer.caf" : nil
                 Task { await NotificationScheduler.register(plan.blocks) }   // repeating starts carry the sound

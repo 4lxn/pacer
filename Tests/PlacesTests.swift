@@ -72,3 +72,27 @@ final class PlacesTests: XCTestCase {
         XCTAssertEqual(trigger.dateComponents.hour, 18); XCTAssertEqual(trigger.dateComponents.minute, 40)   // 19:00 − 20 min (office → gym)
     }
 }
+
+final class PlacesMapsTests: XCTestCase {
+    func testEstimablePairsSkipTypedValuesAndUnpinned() {
+        var p = Places()
+        p.upsert(Place(id: "office", name: "Office", latitude: 19.42, longitude: -99.17))
+        p.upsert(Place(id: "gym", name: "Gym", latitude: 19.41, longitude: -99.16))
+        p.upsert(Place(id: "track", name: "Track"))   // not pinned
+        var home = p.list[0]; home.latitude = 19.43; home.longitude = -99.18; p.upsert(home)
+        XCTAssertEqual(p.estimablePairs.count, 3)     // home-office, home-gym, office-gym
+        p.setTravel("home", "office", minutes: 40)    // typed by hand → left alone
+        XCTAssertEqual(p.estimablePairs.count, 2)
+        p.setTravel("home", "gym", minutes: 20, estimated: true)
+        XCTAssertEqual(p.estimablePairs.count, 2)     // estimates can be refreshed
+        XCTAssertTrue(p.estimated.contains(Places.key("gym", "home")))
+        p.setTravel("home", "gym", minutes: 25)       // typed over → no longer an estimate
+        XCTAssertFalse(p.estimated.contains(Places.key("gym", "home")))
+
+        // Older places.json (no coordinates / estimated / mode) still decodes.
+        let legacy = Data(#"{"list":[{"id":"home","name":"Home","note":""}],"travel":{}}"#.utf8)
+        let decoded = try? JSONDecoder().decode(Places.self, from: legacy)
+        XCTAssertEqual(decoded?.mode, "driving")
+        XCTAssertEqual(decoded?.list.first?.isPinned, false)
+    }
+}
