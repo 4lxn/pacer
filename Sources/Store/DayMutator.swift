@@ -51,6 +51,29 @@ final class DayMutator {
 
     func block(id: String, on date: Date) -> Block? { effectivePlan(on: date).first { $0.id == id } }
 
+    /// The "now" used to judge a day: real time today, start of day for future days (nothing has
+    /// passed yet), end of day for past days (everything has).
+    func clock(for date: Date) -> Date {
+        let current = now()
+        if calendar.isDate(date, inSameDayAs: current) { return current }
+        let start = calendar.startOfDay(for: date)
+        return date > current ? start : (calendar.date(byAdding: .day, value: 1, to: start)?.addingTimeInterval(-60) ?? date)
+    }
+
+    func isEditable(_ date: Date) -> Bool { dayKey(date) >= dayKey(now()) }
+
+    /// Drops every override on a day (moves, one-offs, notes). Skips stay.
+    func resetDay(_ date: Date) {
+        let key = dayKey(date)
+        let o = days.override(dayKey: key)
+        guard !o.isEmpty else { return }
+        for extra in o.extras { center.removePending([NotificationScheduler.movedIdentifier(extra.id, dayKey: key)]) }
+        days.setUndo(UndoRecord(dayKey: key, previousOverride: o, previousSkipped: completions.skipped(dayKey: key), summary: "Reset \(key)"))
+        days.setOverride(DayOverride(), dayKey: key)
+        lastChange = Change(summary: "Day reset to the weekly plan", undoable: true)
+        enqueueRearm()
+    }
+
     func date(_ dayKey: String) -> Date? {
         let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = calendar.timeZone; f.dateFormat = "yyyy-MM-dd"
         return f.date(from: dayKey).flatMap { calendar.date(bySettingHour: 12, minute: 0, second: 0, of: $0) }
@@ -119,7 +142,7 @@ final class DayMutator {
     /// Restores the previous override + skipped set. False when nothing from today is there to undo.
     @discardableResult
     func undo(source: Source = .app) -> Bool {
-        guard let record = days.undo, record.dayKey == dayKey(now()) else {
+        guard let record = days.undo, record.dayKey >= dayKey(now()) else {
             days.setUndo(nil)
             lastChange = nil
             if source == .notification { enqueue { await self.post(title: "Nothing to undo", body: "", category: nil, dayKey: nil) } }
@@ -202,7 +225,7 @@ final class DayMutator {
     private func context(on date: Date) -> Replanner.Context {
         let key = dayKey(date)
         return Replanner.Context(
-            plan: effectivePlan(on: date), override: days.override(dayKey: key), now: now(), dayEnd: days.dayEnd,
+            plan: effectivePlan(on: date), override: days.override(dayKey: key), now: clock(for: date), dayEnd: days.dayEnd,
             completed: completions.completed(dayKey: key), skipped: completions.skipped(dayKey: key), calendar: calendar
         )
     }

@@ -20,6 +20,8 @@ struct DayView: View {
     @State private var editingBlock: Block?
     @State private var addingToday = false
     @State private var showTomorrow = false
+    @State private var showingDays = false
+    @State private var openDay: Date?
     private var persistence: PersistenceState { PersistenceState.shared }
 
     private let calendar = Calendar.current
@@ -80,11 +82,14 @@ struct DayView: View {
             .navigationSubtitle(now.formatted(.dateTime.weekday(.wide).day().month(.wide)))
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button { showingDays = true } label: { Label("Days", systemImage: "calendar") }
                     Button { addingToday = true } label: { Label("Just for today", systemImage: "plus") }
                     Button { editingPlan = true } label: { Label("Edit plan", systemImage: "slider.horizontal.3") }
                     Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
                 }
             }
+            .navigationDestination(isPresented: $showingDays) { DaysView(mutator: mutator, plan: plan, now: now) }
+            .navigationDestination(item: $openDay) { day in DayPlanView(mutator: mutator, plan: plan, date: day, now: now) }
             .sheet(item: $detail) { block in
                 BlockDetailSheet(block: block, now: now, mutator: mutator) { editingBlock = $0 }
             }
@@ -115,6 +120,8 @@ struct DayView: View {
             #if DEBUG
             if CoachAccount.screenshotMode == "settings" { showingSettings = true }
             if CoachAccount.screenshotMode == "detail" { detail = current ?? blocks.first }
+            if CoachAccount.screenshotMode == "days" { showingDays = true }
+            if CoachAccount.screenshotMode == "tomorrow" { openDay = calendar.date(byAdding: .day, value: 1, to: now) }
             #endif
         }
         .sheet(isPresented: $showingSettings) { SettingsView(days: days, metrics: metrics, health: health, account: account, plan: plan) }
@@ -312,6 +319,8 @@ struct DayView: View {
                     .padding(.horizontal, 7).padding(.vertical, 2)
                     .background(Color(uiColor: .tertiarySystemFill), in: Capsule()).foregroundStyle(.secondary)
                 Text(day.formatted(.dateTime.weekday(.wide))).font(.subheadline).foregroundStyle(.secondary)
+                Spacer()
+                Button("Edit") { openDay = day }.font(.subheadline).buttonStyle(.glass).controlSize(.small)
             }
         }
         .tint(.secondary)
