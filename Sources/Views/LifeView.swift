@@ -12,7 +12,7 @@ struct FocusTab: View {
 struct MoneyTab: View {
     @Bindable var track: TrackStore
     var body: some View {
-        NavigationStack { TrackContent(track: track, part: .money).navigationTitle("Money") }
+        NavigationStack { MoneyContent(track: track).navigationTitle("Money") }
     }
 }
 

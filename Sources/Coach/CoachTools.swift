@@ -135,6 +135,13 @@ struct CoachTools {
             "minutes": ["type": "integer"], "topic": str(""), "start": str("HH:MM today; default = now minus minutes"),
         ], required: ["minutes"]),
         tool("delete_study_session", "Delete a study session by id (from get_study).", ["id": str("")], required: ["id"]),
+        tool("add_expense", "Log an expense (money spent).", [
+            "amount": num("Amount"), "category": str("Rent, Food, Transport, Gym, Health, Fun, Shopping, Bills, Other or a custom one"),
+            "note": str("What it was"), "date": str("YYYY-MM-DD; omit for today"),
+        ], required: ["amount", "category"]),
+        tool("delete_expense", "Delete an expense by id (from get_money_month).", ["id": str("")], required: ["id"]),
+        tool("get_money_month", "This month's income, spend by category vs budgets, savings and rate, plus recent entries with ids.", [:]),
+        tool("set_budget", "Set a monthly budget for an expense category (0 removes it).", ["category": str(""), "amount": num("")], required: ["category", "amount"]),
         tool("set_income_goal", "Set the monthly income goal (0 clears it).", ["amount": num("")], required: ["amount"]),
         tool("start_focus", "Start a focus session now (shows in the Dynamic Island). minutes 0 = open-ended.", [
             "subject": str("Subject name; created if new"), "minutes": ["type": "integer", "description": "25, 50, 90 or 0 for open"],
@@ -543,6 +550,27 @@ struct CoachTools {
             guard let id = input["id"] as? String, track.sessions.contains(where: { $0.id == id }) else { return Result(output: "No session with that id", isError: true) }
             track.deleteSession(id: id)
             return Result(output: "Deleted session", summary: "Removed a study session")
+
+        case "add_expense":
+            guard let amount = Self.double(input["amount"]), let category = input["category"] as? String else { return Result(output: "amount and category are required", isError: true) }
+            track.addExpense(category: category, amount: Decimal(amount), note: input["note"] as? String ?? "", on: day)
+            return Result(output: "Logged \(amount) on \(category); spent this month \(track.expenseTotal(monthOf: today))", summary: "Spent \(Int(amount)) · \(category)")
+
+        case "delete_expense":
+            guard let id = input["id"] as? String, track.expenses.contains(where: { $0.id == id }) else { return Result(output: "No expense with that id", isError: true) }
+            track.deleteExpense(id: id)
+            return Result(output: "Deleted", summary: "Removed an expense")
+
+        case "get_money_month":
+            var lines = ["Income \(track.incomeTotal(monthOf: today)), spent \(track.expenseTotal(monthOf: today)), saved \(track.saved(monthOf: today))" + (track.savingsRate(monthOf: today).map { String(format: " (%.0f%%)", $0 * 100) } ?? "")]
+            for c in track.expensesByCategory(monthOf: today) { lines.append("- \(c.category): \(c.amount)" + (track.budgets[c.category].map { " / budget \($0)" } ?? "")) }
+            for e in track.expenses(monthOf: today).prefix(15) { lines.append("\(e.id) | \(e.date.formatted(date: .abbreviated, time: .omitted)) | \(e.category) | \(e.amount)" + (e.note.isEmpty ? "" : " | \(e.note)")) }
+            return Result(output: lines.joined(separator: "\n"))
+
+        case "set_budget":
+            guard let category = input["category"] as? String, let amount = Self.double(input["amount"]) else { return Result(output: "category and amount are required", isError: true) }
+            track.setBudget(Decimal(amount), category: category)
+            return Result(output: "Budget for \(category): \(amount)", summary: "Budget \(category): \(Int(amount))")
 
         case "set_income_goal":
             guard let amount = Self.double(input["amount"]) else { return Result(output: "amount is required", isError: true) }

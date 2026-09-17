@@ -18,6 +18,31 @@ struct Subject: Codable, Identifiable, Hashable, Sendable {
     var symbol: String = "book"
 }
 
+struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
+    var id: String = UUID().uuidString
+    var date: Date
+    var category: String
+    var note: String = ""
+    var amount: Decimal
+}
+
+enum ExpenseCategory {
+    static let defaults = ["Rent", "Food", "Transport", "Gym", "Health", "Fun", "Shopping", "Bills", "Other"]
+    static func symbol(_ name: String) -> String {
+        switch name.lowercased() {
+        case "rent", "home": "house"
+        case "food", "groceries": "cart"
+        case "transport", "car", "uber": "car"
+        case "gym", "training": "dumbbell"
+        case "health": "cross.case"
+        case "fun", "going out": "party.popper"
+        case "shopping", "clothes": "bag"
+        case "bills", "subscriptions": "doc.text"
+        default: "creditcard"
+        }
+    }
+}
+
 struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
     var id: String = UUID().uuidString
     var date: Date
@@ -38,11 +63,16 @@ final class TrackStore {
         var runningUntil: Date?
         var monthlyIncomeGoal: Decimal?
         var subjects: [Subject]?
+        var expenses: [ExpenseEntry]?
+        var budgets: [String: Decimal]?
     }
 
     private(set) var sessions: [StudySession] = []
     private(set) var subjects: [Subject] = []
     private(set) var income: [IncomeEntry] = []
+    private(set) var expenses: [ExpenseEntry] = []
+    /// Monthly budget per category (flat, every month).
+    private(set) var budgets: [String: Decimal] = [:]
     var weeklyStudyGoalMinutes = 300 { didSet { save() } }
     var monthlyIncomeGoal: Decimal = 0 { didSet { save() } }
     private(set) var runningSince: Date?
@@ -65,6 +95,8 @@ final class TrackStore {
             runningSince = s.runningSince; runningTopic = s.runningTopic; runningUntil = s.runningUntil
             monthlyIncomeGoal = s.monthlyIncomeGoal ?? 0
             subjects = s.subjects ?? []
+            expenses = s.expenses ?? []
+            budgets = s.budgets ?? [:]
             // Adopt topics from older sessions as subjects.
             for topic in Set(sessions.map(\.topic)) where topic != "Study" && !subjects.contains(where: { $0.name.caseInsensitiveCompare(topic) == .orderedSame }) {
                 subjects.append(Subject(name: topic))
@@ -225,6 +257,63 @@ final class TrackStore {
         }
     }
 
+    // MARK: - Expenses
+
+    func addExpense(category: String, amount: Decimal, note: String = "", on date: Date = .now) {
+        expenses.append(ExpenseEntry(date: date, category: category.isEmpty ? "Other" : category, note: note, amount: amount))
+        save()
+    }
+
+    func deleteExpense(id: String) {
+        expenses.removeAll { $0.id == id }
+        save()
+    }
+
+    func setBudget(_ amount: Decimal, category: String) {
+        if amount <= 0 { budgets.removeValue(forKey: category) } else { budgets[category] = amount }
+        save()
+    }
+
+    func expenses(monthOf date: Date) -> [ExpenseEntry] {
+        guard let month = calendar.dateInterval(of: .month, for: date) else { return [] }
+        return expenses.filter { month.contains($0.date) }.sorted { $0.date > $1.date }
+    }
+
+    func expenseTotal(monthOf date: Date) -> Decimal { expenses(monthOf: date).reduce(0) { $0 + $1.amount } }
+
+    /// Per-category spend for the month, largest first; budgeted categories with no spend included.
+    func expensesByCategory(monthOf date: Date) -> [(category: String, amount: Decimal)] {
+        var totals: [String: Decimal] = [:]
+        for e in expenses(monthOf: date) { totals[e.category, default: 0] += e.amount }
+        for c in budgets.keys where totals[c] == nil { totals[c] = 0 }
+        return totals.map { ($0.key, $0.value) }.sorted { $0.amount > $1.amount }
+    }
+
+    /// Categories seen so far plus the defaults, most used first.
+    var expenseCategories: [String] {
+        var counts: [String: Int] = [:]
+        for e in expenses { counts[e.category, default: 0] += 1 }
+        let used = counts.keys.sorted { (counts[$0]!, $0) > (counts[$1]!, $1) }
+        return used + ExpenseCategory.defaults.filter { !counts.keys.contains($0) }
+    }
+
+    func saved(monthOf date: Date) -> Decimal { incomeTotal(monthOf: date) - expenseTotal(monthOf: date) }
+
+    /// Saved ÷ income; nil without income.
+    func savingsRate(monthOf date: Date) -> Double? {
+        let income = incomeTotal(monthOf: date)
+        guard income > 0 else { return nil }
+        return NSDecimalNumber(decimal: saved(monthOf: date)).doubleValue / NSDecimalNumber(decimal: income).doubleValue
+    }
+
+    /// Income and spend per month, oldest first.
+    func moneyByMonth(months: Int, now: Date) -> [(month: Date, income: Decimal, spent: Decimal)] {
+        (0..<months).reversed().compactMap { offset in
+            guard let m = calendar.date(byAdding: .month, value: -offset, to: now), let start = calendar.dateInterval(of: .month, for: m)?.start else { return nil }
+            return (start, incomeTotal(monthOf: m), expenseTotal(monthOf: m))
+        }
+    }
+
     func incomeTotal(yearOf date: Date) -> Decimal {
         guard let year = calendar.dateInterval(of: .year, for: date) else { return 0 }
         return income.filter { year.contains($0.date) }.reduce(0) { $0 + $1.amount }
@@ -238,6 +327,10 @@ final class TrackStore {
         if !topics.isEmpty { lines.append("By subject this week: " + topics.map { "\($0.topic) \($0.minutes) min" }.joined(separator: ", ")) }
         if !subjects.isEmpty { lines.append("Subjects: " + subjects.map { $0.weeklyGoalMinutes > 0 ? "\($0.name) (goal \($0.weeklyGoalMinutes) min/wk)" : $0.name }.joined(separator: ", ")) }
         if monthlyIncomeGoal > 0 { lines.append("Income this month: \(incomeTotal(monthOf: now)) of goal \(monthlyIncomeGoal)") }
+        if !expenses(monthOf: now).isEmpty || !budgets.isEmpty {
+            let cats = expensesByCategory(monthOf: now).map { c in "\(c.category) \(c.amount)" + (budgets[c.category].map { " / \($0)" } ?? "") }.joined(separator: ", ")
+            lines.append("Spent this month: \(expenseTotal(monthOf: now)) (\(cats)); saved \(saved(monthOf: now))" + (savingsRate(monthOf: now).map { String(format: ", %.0f%% of income", $0 * 100) } ?? ""))
+        }
         if let since = runningSince {
             lines.append("A study session is running since \(since.formatted(date: .omitted, time: .shortened)) (\(runningTopic)).")
         }
@@ -248,6 +341,6 @@ final class TrackStore {
 
     private func save() {
         JSONFile.save(Snapshot(sessions: sessions, income: income, weeklyStudyGoalMinutes: weeklyStudyGoalMinutes, runningSince: runningSince, runningTopic: runningTopic,
-                               runningUntil: runningUntil, monthlyIncomeGoal: monthlyIncomeGoal, subjects: subjects), to: fileURL)
+                               runningUntil: runningUntil, monthlyIncomeGoal: monthlyIncomeGoal, subjects: subjects, expenses: expenses, budgets: budgets), to: fileURL)
     }
 }
