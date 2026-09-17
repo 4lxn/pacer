@@ -32,9 +32,9 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Autopiloto.entitlements
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
-        INFOPLIST_KEY_CFBundleDisplayName: Autopiloto
-        INFOPLIST_KEY_NSHealthShareUsageDescription: "Autopiloto reads your workouts, weight and steps to close training blocks automatically and show your training week."
-        INFOPLIST_KEY_NSHealthUpdateUsageDescription: "Autopiloto saves the weight you log so it shows up in Health and in your other apps."
+        INFOPLIST_KEY_CFBundleDisplayName: Pacer
+        INFOPLIST_KEY_NSHealthShareUsageDescription: "Pacer reads your workouts, weight and steps to close training blocks automatically and show your training week."
+        INFOPLIST_KEY_NSHealthUpdateUsageDescription: "Pacer saves the weight you log so it shows up in Health and in your other apps."
         INFOPLIST_KEY_NSCameraUsageDescription: "Photograph a garment to add it to your closet."
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Pick a photo of a garment to add it to your closet."
         GENERATE_INFOPLIST_FILE: YES
@@ -79,7 +79,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alan.autopiloto.widget
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Autopiloto
+        INFOPLIST_KEY_CFBundleDisplayName: Pacer
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "3"

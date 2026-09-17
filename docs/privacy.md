@@ -1,13 +1,13 @@
-# Autopiloto — Privacy Policy
+# Pacer — Privacy Policy
 
 _Last updated: 2026-09-16_
 
-Autopiloto is a personal day planner. It is built so that your data stays on your device.
+Pacer (bundle id com.alan.autopiloto) is a personal day planner. It is built so that your data stays on your device.
 
 ## What the app stores, and where
 
 - **Your plan, completions, meals, pantry, study sessions, income entries, closet and photos** are
-  stored only on your iPhone, in the app's private container. They are never uploaded by the app.
+  stored only on your iPhone, in the app's private container (shared with its home screen widget). They are never uploaded by the app.
 - **Apple Health** (workouts, weight, steps) is read on your device to show your training and to
   mark blocks done. The weight you log is written to Apple Health. Health data never leaves your
   device and is never sent to us or to any third party.
