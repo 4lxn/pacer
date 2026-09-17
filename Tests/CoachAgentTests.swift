@@ -269,3 +269,11 @@ final class ChatHistoryTests: XCTestCase {
         XCTAssertTrue(reloaded.entries.isEmpty)
     }
 }
+
+final class ToolCapTests: XCTestCase {
+    /// The proxy refuses requests with more than 80 tools (server/src/index.mjs); every section on must fit.
+    func testAllToolsFitUnderTheProxyCap() {
+        XCTAssertLessThanOrEqual(CoachTools.definitions.count, 80)
+        XCTAssertEqual(Set(CoachTools.definitions.compactMap { $0["name"] as? String }).count, CoachTools.definitions.count, "duplicate tool names")
+    }
+}

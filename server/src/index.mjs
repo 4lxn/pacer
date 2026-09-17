@@ -72,7 +72,7 @@ async function handleCoach(req, res) {
   if (Array.isArray(body.messages)) {
     // Agent shape: the client owns the conversation (thinking/tool_use blocks replay verbatim).
     if (body.messages.length > 60) return json(res, 400, { error: "too many messages (max 60)" });
-    if (body.tools && (!Array.isArray(body.tools) || body.tools.length > 48)) return json(res, 400, { error: "too many tools (max 48)" });
+    if (body.tools && (!Array.isArray(body.tools) || body.tools.length > 80)) return json(res, 400, { error: "too many tools (max 80)" });
     messages = body.messages;
     tools = body.tools;
   } else if (typeof body.question === "string") {
