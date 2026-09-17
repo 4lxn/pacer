@@ -8,6 +8,7 @@ struct NowCard: View {
     let calendar: Calendar
     let onDone: (String) -> Void
     var onSkip: ((String) -> Void)? = nil
+    var onReplan: ((String) -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -41,10 +42,22 @@ struct NowCard: View {
                 }
                 .buttonStyle(.glassProminent)
                 .tint(status == .missed ? .red : .accentColor)
-                if status == .missed, let onSkip {
-                    Button("Skip today") { onSkip(block.id) }
-                        .buttonStyle(.glass)
-                        .frame(maxWidth: .infinity)
+                if status == .missed {
+                    HStack(spacing: 10) {
+                        if let onReplan, block.kind != .free, !block.isAnchor {
+                            Button { onReplan(block.id) } label: {
+                                Label("Move it later", systemImage: "arrow.right.circle").frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.glass)
+                        }
+                        if let onSkip {
+                            Button { onSkip(block.id) } label: {
+                                Label("Skip today", systemImage: "minus.circle").frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.glass)
+                        }
+                    }
+                    .labelStyle(.titleAndIcon)
                 }
             } else if allDone {
                 Text("All done for today").font(.largeTitle.weight(.bold))

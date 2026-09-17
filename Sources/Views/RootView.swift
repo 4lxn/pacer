@@ -3,6 +3,8 @@ import SwiftUI
 struct RootView: View {
     @Bindable var store: CompletionStore
     @Bindable var plan: PlanStore
+    @Bindable var days: DayStore
+    @Bindable var mutator: DayMutator
     @Bindable var health: HealthStore
     @Bindable var food: FoodStore
     @Bindable var track: TrackStore
@@ -22,7 +24,7 @@ struct RootView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            DayView(store: store, plan: plan, health: health, track: track)
+            DayView(store: store, plan: plan, days: days, mutator: mutator, health: health, track: track)
                 .tabItem { Label("Today", systemImage: "sun.max") }.tag("today")
             TrainView(health: health)
                 .tabItem { Label("Train", systemImage: "figure.run") }.tag("train")
@@ -35,7 +37,7 @@ struct RootView: View {
         }
         .tabBarMinimizeBehavior(.onScrollDown)
         .fullScreenCover(isPresented: Binding(get: { plan.needsOnboarding }, set: { _ in })) {
-            OnboardingView { plan.replace(with: $0) }
+            OnboardingView { blocks, dayEnd in plan.replace(with: blocks); days.dayEnd = dayEnd }
         }
         .onChange(of: plan.blocks) { _, blocks in
             Task { await NotificationScheduler.register(blocks) }

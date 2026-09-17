@@ -11,6 +11,7 @@ struct CoachTools {
     let wardrobe: WardrobeStore
     let health: HealthStore
     let track: TrackStore
+    let mutator: DayMutator
     var calendar: Calendar = .current
     var now: () -> Date = { .now }
 
@@ -24,7 +25,7 @@ struct CoachTools {
 
     static let definitions: [[String: Any]] = [
         // Plan
-        tool("get_plan", "Today's blocks with ids, times and status (done, current, upcoming, missed).", [:]),
+        tool("get_plan", "Today's blocks with ids, times and status (done, current, upcoming, missed, skipped). Blocks moved for today only are marked 'moved'.", [:]),
         tool("add_block", "Add a block to the plan. Times are HH:MM 24h. kind: fixed (notifies at start), window (anytime in range), free (no clock).", [
             "label": str("Short label"), "kind": enumOf(["fixed", "window", "free"]),
             "start": str("HH:MM, omit for free"), "end": str("HH:MM, omit for free"),
@@ -44,6 +45,10 @@ struct CoachTools {
         tool("skip_today", "Skip a block for today only (it leaves today's count; the plan is unchanged). undo=true puts it back.", [
             "id": str("Block id"), "undo": ["type": "boolean"],
         ], required: ["id"]),
+        tool("move_today", "Move a missed or upcoming block to later TODAY only (the weekly plan is unchanged). Omit start to let the app find the first free slot after now; pass start (HH:MM) to place it there. Later windows are pushed forward if needed. Use update_block instead to change the plan permanently.", [
+            "id": str("Block id"), "start": str("HH:MM; omit for the first free slot"),
+        ], required: ["id"]),
+        tool("undo_replan", "Undo the last move_today or skip_today made today.", [:]),
         // Food
         tool("get_pantry", "Pantry items with quantity, unit and minimum; items below minimum are on the grocery list.", [:]),
         tool("add_pantry_item", "Add a pantry item, or set quantity/unit/minimum of an existing one with the same name.", [
@@ -122,13 +127,14 @@ struct CoachTools {
         let today = now()
         switch name {
         case "get_plan":
-            let blocks = DayLogic.sorted(plan.today(on: today, calendar: calendar))
+            let blocks = DayLogic.sorted(mutator.effectivePlan(on: today))
             let completed = completions.completed(on: today)
             let skipped = completions.skipped(on: today)
+            let moved = mutator.days.override(dayKey: mutator.dayKey(today)).moved
             let lines = blocks.map { b -> String in
                 let time = b.start.map { NotificationScheduler.clock($0) + "–" + NotificationScheduler.clock(b.end ?? $0) } ?? "anytime"
                 let status = b.status(now: today, completed: completed, skipped: skipped, calendar: calendar)
-                return "\(b.id) | \(time) | \(b.label) | \(b.kind.rawValue) | \(status)" + (b.isAnchor ? " | anchor" : "")
+                return "\(b.id) | \(time) | \(b.label) | \(b.kind.rawValue) | \(status)" + (b.isAnchor ? " | anchor" : "") + (moved[b.id] != nil ? " | moved" : "")
             }
             return Result(output: lines.isEmpty ? "No blocks today." : lines.joined(separator: "\n"))
 
@@ -173,17 +179,32 @@ struct CoachTools {
             guard let id = input["id"] as? String, let block = plan.block(id: id) else { return Result(output: "No block with that id", isError: true) }
             let done = input["done"] as? Bool ?? true
             let isDone = completions.completed(on: today).contains(id)
-            if done != isDone { completions.toggle(id, on: today) }
+            if done != isDone { mutator.setDone(id, done, dayKey: mutator.dayKey(today)) }
             return Result(output: "\(block.label) is now \(done ? "done" : "not done")", summary: "\(done ? "Done" : "Undone"): \(block.label)")
 
         case "skip_today":
             guard let id = input["id"] as? String, let block = plan.block(id: id) else { return Result(output: "No block with that id", isError: true) }
             if input["undo"] as? Bool == true {
-                completions.unskip(id, on: today)
+                mutator.unskip(id, on: today)
                 return Result(output: "\(block.label) is back on today's plan", summary: "Unskipped \(block.label)")
             }
-            completions.skip(id, on: today)
+            mutator.skipToday(id, dayKey: mutator.dayKey(today))
             return Result(output: "Skipped \(block.label) for today", summary: "Skipped \(block.label) today")
+
+        case "move_today":
+            guard let id = input["id"] as? String, plan.block(id: id) != nil else { return Result(output: "No block with that id", isError: true) }
+            let outcome: Replanner.Outcome
+            if let start = Self.hm(input["start"]) { outcome = mutator.move(id, to: start, on: today) } else { outcome = mutator.replan(id, on: today) }
+            switch outcome {
+            case .rejected(let reason): return Result(output: reason, isError: true)
+            case .noRoom: return Result(output: mutator.lastChange?.summary ?? "No room today", summary: mutator.lastChange?.summary)
+            default: return Result(output: mutator.lastChange?.summary ?? "Moved", summary: mutator.lastChange?.summary)
+            }
+
+        case "undo_replan":
+            let summary = mutator.days.undo?.summary
+            guard mutator.undo() else { return Result(output: "Nothing to undo today", isError: true) }
+            return Result(output: "Undone: \(summary ?? "")", summary: "Undid: \(summary ?? "last change")")
 
         case "get_pantry":
             guard !food.pantry.isEmpty else { return Result(output: "Pantry is empty.") }

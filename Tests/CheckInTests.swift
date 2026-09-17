@@ -36,7 +36,7 @@ final class CheckInTests: XCTestCase {
     func testBuildsOneShotCheckInsForTodayAndTomorrowSkippingPastDoneAndSkipped() {
         let now = date(16, 12)
         let requests = NotificationScheduler.buildCheckIns(
-            for: Plan.blocks, now: now,
+            plan: { _ in Plan.blocks }, now: now,
             completed: { $0 == "2026-09-16" ? ["b09"] : [] },
             skipped: { $0 == "2026-09-17" ? ["b17"] : [] },
             calendar: calendar
@@ -90,8 +90,10 @@ final class CheckInTests: XCTestCase {
         let store = CompletionStore(fileURL: dir.appendingPathComponent("completions.json"), calendar: calendar)
         let plan = PlanStore(fileURL: dir.appendingPathComponent("plan.json"))
         plan.replace(with: Plan.blocks)
-        let delegate = NotificationDelegate(store: store, plan: plan, calendar: calendar)
         let fake = FakeCenter(pending: ["checkin-b21-2026-09-16"])
+        let mutator = DayMutator(plan: plan, completions: store, days: DayStore(directory: dir), calendar: calendar,
+                                 now: { self.date(16, 12) }, center: fake.client)
+        let delegate = NotificationDelegate(mutator: mutator, calendar: calendar)
 
         // A 23:15 block confirmed at 00:01 the next day lands on the 16th, not the 17th.
         let key = NotificationDelegate.dayKey(userInfo: ["blockId": "b21"], fireDate: date(16, 23, 15), calendar: calendar)
@@ -104,7 +106,17 @@ final class CheckInTests: XCTestCase {
 
         await delegate.handle(.skipToday, blockID: "b17", dayKey: "2026-09-16", center: fake.client)
         XCTAssertTrue(store.skipped(dayKey: "2026-09-16").contains("b17"))
+        // A skip from the lock screen posts an undoable confirmation; UNDO reverts it.
+        XCTAssertEqual(fake.added.last?.content.categoryIdentifier, NotificationScheduler.undoCategoryID)
+        await delegate.handle(.undo, blockID: nil, dayKey: "2026-09-16", center: fake.client)
+        XCTAssertFalse(store.skipped(dayKey: "2026-09-16").contains("b17"))
 
+        // REPLAN on a missed block moves it and arms a one-shot start at the new time.
+        await delegate.handle(.replan, blockID: "b09", dayKey: "2026-09-16", center: fake.client)
+        let moved = mutator.days.override(dayKey: "2026-09-16").moved["b09"]
+        XCTAssertNotNil(moved)
+        XCTAssertTrue(fake.pending.contains("moved-b09-2026-09-16"))
+        
         await delegate.handle(.snooze, blockID: "b13", dayKey: "2026-09-16", center: fake.client)
         XCTAssertTrue(fake.pending.contains("b13-snooze"))
         XCTAssertEqual(NotificationDelegate.action(for: "SKIP_TODAY"), .skipToday)

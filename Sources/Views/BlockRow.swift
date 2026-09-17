@@ -4,9 +4,11 @@ struct BlockRow: View {
     let block: Block
     let status: BlockStatus
     let subtitle: String?
+    var moved = false
     let onToggle: () -> Void
     var onSkip: (() -> Void)? = nil
     var onUnskip: (() -> Void)? = nil
+    var onReplan: (() -> Void)? = nil
 
     var body: some View {
         Button(action: onToggle) {
@@ -27,6 +29,11 @@ struct BlockRow: View {
                             Image(systemName: "anchor").font(.caption).foregroundStyle(.secondary)
                                 .accessibilityLabel("Anchor")
                         }
+                        if moved {
+                            Image(systemName: "arrow.right.circle").font(.caption).foregroundStyle(Color.accentColor)
+                                .accessibilityLabel("Moved today")
+                                .transition(.scale.combined(with: .opacity))
+                        }
                     }
                     if let subtitle {
                         Text(subtitle).font(.caption).foregroundStyle(.secondary)
@@ -45,8 +52,11 @@ struct BlockRow: View {
         .contextMenu {
             if status == .skipped, let onUnskip {
                 Button("Back on today's plan", systemImage: "arrow.uturn.backward") { onUnskip() }
-            } else if status != .done, let onSkip {
-                Button("Skip today", systemImage: "minus.circle") { onSkip() }
+            } else if status != .done {
+                if (status == .missed || status == .upcoming), block.kind != .free, !block.isAnchor, let onReplan {
+                    Button("Move it later today", systemImage: "arrow.right.circle") { onReplan() }
+                }
+                if let onSkip { Button("Skip today", systemImage: "minus.circle") { onSkip() } }
             }
         }
         .accessibilityValue(accessibilityStatus)
@@ -58,7 +68,7 @@ struct BlockRow: View {
     }
 
     private var kindChip: some View {
-        Text(status == .skipped ? "skipped" : block.kind.rawValue)
+        Text(status == .skipped ? "skipped" : moved ? "moved" : block.kind.rawValue)
             .font(.caption2.weight(.medium))
             .padding(.horizontal, 6)
             .padding(.vertical, 2)

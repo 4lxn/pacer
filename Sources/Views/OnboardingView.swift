@@ -3,7 +3,8 @@ import SwiftUI
 /// First launch: wake and sleep times build a starter plan, the notification permission, then five
 /// short questions that become the Coach profile. Every step can be skipped.
 struct OnboardingView: View {
-    let onFinish: ([Block]) -> Void
+    /// Blocks plus the day end (sleep time, clamped to the calendar day).
+    let onFinish: ([Block], DateComponents) -> Void
 
     @State private var wake = Calendar.current.date(bySettingHour: 7, minute: 30, second: 0, of: .now) ?? .now
     @State private var sleep = Calendar.current.date(bySettingHour: 23, minute: 0, second: 0, of: .now) ?? .now
@@ -160,6 +161,7 @@ struct OnboardingView: View {
     private func finish() {
         let w = calendar.dateComponents([.hour, .minute], from: wake)
         let s = calendar.dateComponents([.hour, .minute], from: sleep)
-        onFinish(Plan.starter(wake: .hm(w.hour ?? 7, w.minute ?? 30), sleep: .hm(s.hour ?? 23, s.minute ?? 0)))
+        let wake = DateComponents.hm(w.hour ?? 7, w.minute ?? 30), sleep = DateComponents.hm(s.hour ?? 23, s.minute ?? 0)
+        onFinish(Plan.starter(wake: wake, sleep: sleep), DayStore.dayEnd(fromSleep: sleep, wake: wake))
     }
 }

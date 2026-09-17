@@ -8,8 +8,9 @@ struct AutopilotoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView(store: appDelegate.store, plan: appDelegate.plan, health: appDelegate.health, food: appDelegate.food,
-                     track: appDelegate.track, account: appDelegate.account, wardrobe: appDelegate.wardrobe, agent: appDelegate.agent)
+            RootView(store: appDelegate.store, plan: appDelegate.plan, days: appDelegate.days, mutator: appDelegate.mutator,
+                     health: appDelegate.health, food: appDelegate.food, track: appDelegate.track, account: appDelegate.account,
+                     wardrobe: appDelegate.wardrobe, agent: appDelegate.agent)
         }
     }
 }
@@ -26,16 +27,26 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     let track = TrackStore()
     let account = CoachAccount()
     let wardrobe = WardrobeStore()
+    let days = DayStore()
+    lazy var mutator = DayMutator(plan: plan, completions: store, days: days)
     lazy var agent = CoachAgent(
         chat: CoachChatStore(),
-        tools: CoachTools(plan: plan, completions: store, food: food, wardrobe: wardrobe, health: health, track: track)
+        tools: CoachTools(plan: plan, completions: store, food: food, wardrobe: wardrobe, health: health, track: track, mutator: mutator)
     )
-    private(set) lazy var notificationDelegate = NotificationDelegate(store: store, plan: plan)
+    private(set) lazy var notificationDelegate = NotificationDelegate(mutator: mutator)
 
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        #if DEBUG
+        // Screenshots / UI checks: seed the sample plan so onboarding doesn't show.
+        if CoachAccount.screenshotMode != nil, plan.needsOnboarding { plan.replace(with: Plan.blocks) }
+        if CoachAccount.screenshotMode == "replan" {
+            let missed = DayLogic.sorted(mutator.effectivePlan(on: .now)).filter { $0.status(now: .now, completed: [], calendar: .current) == .missed && $0.kind != .free && !$0.isAnchor }
+            if let block = missed.last { mutator.replan(block.id, on: .now) }
+        }
+        #endif
         let center = UNUserNotificationCenter.current()
         center.delegate = notificationDelegate
         NotificationScheduler.registerCategory(center: center)

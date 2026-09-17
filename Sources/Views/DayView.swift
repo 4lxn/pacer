@@ -4,6 +4,8 @@ import UIKit
 struct DayView: View {
     @Bindable var store: CompletionStore
     @Bindable var plan: PlanStore
+    @Bindable var days: DayStore
+    @Bindable var mutator: DayMutator
     @Bindable var health: HealthStore
     @Bindable var track: TrackStore
     @Environment(\.scenePhase) private var scenePhase
@@ -16,7 +18,8 @@ struct DayView: View {
     private let calendar = Calendar.current
     private let tick = Timer.publish(every: 20, on: .main, in: .common).autoconnect()
 
-    private var blocks: [Block] { DayLogic.sorted(plan.today(on: now, calendar: calendar)) }
+    private var blocks: [Block] { DayLogic.sorted(mutator.effectivePlan(on: now)) }
+    private var moved: Set<String> { Set(days.override(dayKey: mutator.dayKey(now)).moved.keys) }
     private var completed: Set<String> { store.completed(on: now) }
     private var skipped: Set<String> { store.skipped(on: now) }
     /// Skipped blocks leave the denominator: "n / N today" counts what is still on the plan.
@@ -35,15 +38,20 @@ struct DayView: View {
                     now: now,
                     completed: completed,
                     calendar: calendar,
-                    onDone: { id in store.markDone(id, on: now); Task { await rearmCheckIns() } },
-                    onSkip: { id in store.skip(id, on: now); Task { await rearmCheckIns() } }
+                    onDone: { id in mutator.setDone(id, true, dayKey: mutator.dayKey(now)) },
+                    onSkip: { id in mutator.skipToday(id, dayKey: mutator.dayKey(now)) },
+                    onReplan: { id in mutator.replan(id, on: now) }
                 )
                 upNext
                 dayList
             }
             .padding()
+            .padding(.bottom, 72)   // room for the undo toast
         }
         .background(Color(uiColor: .systemGroupedBackground))
+        .overlay(alignment: .bottom) { undoToast }
+        .animation(.snappy(duration: 0.35), value: mutator.lastChange)
+        .animation(.snappy(duration: 0.35), value: moved)
         .onReceive(tick) { now = $0 }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
@@ -56,7 +64,7 @@ struct DayView: View {
                 }
             }
         }
-        .sheet(isPresented: $editingPlan) { PlanView(plan: plan) }
+        .sheet(isPresented: $editingPlan) { PlanView(plan: plan, days: days) }
         .onChange(of: track.sessions) { _, _ in Task { await autoCompleteFromHealth() } }
         .task(id: plan.needsOnboarding) {
             // Onboarding asks for the permission itself; don't double-prompt behind the cover.
@@ -153,9 +161,11 @@ struct DayView: View {
                         block: block,
                         status: block.status(now: now, completed: completed, skipped: skipped, calendar: calendar),
                         subtitle: block.note(on: now, calendar: calendar),
-                        onToggle: { store.toggle(block.id, on: now); Task { await rearmCheckIns() } },
-                        onSkip: { store.skip(block.id, on: now); Task { await rearmCheckIns() } },
-                        onUnskip: { store.unskip(block.id, on: now); Task { await rearmCheckIns() } }
+                        moved: moved.contains(block.id),
+                        onToggle: { mutator.toggleDone(block.id, on: now) },
+                        onSkip: { mutator.skipToday(block.id, dayKey: mutator.dayKey(now)) },
+                        onUnskip: { mutator.unskip(block.id, on: now) },
+                        onReplan: { mutator.replan(block.id, on: now) }
                     )
                     if block.id != blocks.last?.id { Divider().padding(.leading, 72) }
                 }
@@ -170,12 +180,37 @@ struct DayView: View {
     }
 
     /// Check-ins are one-shot (today + tomorrow); re-arm after anything that changes what's done.
-    private func rearmCheckIns() async {
-        _ = await NotificationScheduler.rearmCheckIns(
-            for: plan.blocks, now: now,
-            completed: { store.completed(dayKey: $0) }, skipped: { store.skipped(dayKey: $0) },
-            calendar: calendar
-        )
+    private func rearmCheckIns() async { mutator.now = { .now }; await mutator.rearm() }
+
+    /// One line + Undo, bottom of the screen, gone after a few seconds or a tap.
+    @ViewBuilder
+    private var undoToast: some View {
+        if let change = mutator.lastChange {
+            HStack(spacing: 12) {
+                Image(systemName: change.undoable ? "arrow.triangle.2.circlepath" : "exclamationmark.circle")
+                    .foregroundStyle(change.undoable ? Color.accentColor : .orange)
+                Text(change.summary).font(.subheadline).lineLimit(2)
+                Spacer(minLength: 4)
+                if change.undoable {
+                    Button("Undo") { mutator.undo() }
+                        .font(.subheadline.weight(.semibold))
+                        .buttonStyle(.glassProminent)
+                        .controlSize(.small)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20))
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .sensoryFeedback(change.undoable ? .success : .warning, trigger: change)
+            .onTapGesture { mutator.clearLastChange() }
+            .task(id: change) {
+                try? await Task.sleep(for: .seconds(6))
+                if mutator.lastChange == change { mutator.clearLastChange() }
+            }
+        }
     }
 
     /// A run or strength workout in Apple Health today, or 20+ min of study, closes the matching blocks.
