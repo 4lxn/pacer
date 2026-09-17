@@ -128,3 +128,37 @@ final class FocusSubjectsTests: XCTestCase {
         XCTAssertTrue(again.subjects.isEmpty)
     }
 }
+
+@MainActor
+final class MoneyTests: XCTestCase {
+    private let calendar: Calendar = {
+        var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "America/Mexico_City")!; return c
+    }()
+    private func date(_ d: Int, month: Int = 9) -> Date { calendar.date(from: DateComponents(year: 2026, month: month, day: d, hour: 12))! }
+
+    func testExpensesBudgetsAndSavings() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("track.json")
+        let t = TrackStore(fileURL: url, calendar: calendar)
+        t.addIncome(source: "Salary", amount: 30000, on: date(1))
+        t.addExpense(category: "Rent", amount: 12000, note: "Sept", on: date(2))
+        t.addExpense(category: "Food", amount: 3500, on: date(5))
+        t.addExpense(category: "Food", amount: 1500, on: date(9))
+        t.addExpense(category: "Fun", amount: 800, on: date(3, month: 8))   // last month
+        t.setBudget(6000, category: "Food"); t.setBudget(500, category: "Transport")
+        XCTAssertEqual(t.expenseTotal(monthOf: date(16)), 17000)
+        XCTAssertEqual(t.saved(monthOf: date(16)), 13000)
+        XCTAssertEqual(t.savingsRate(monthOf: date(16))!, 13000.0 / 30000.0, accuracy: 0.0001)
+        XCTAssertEqual(t.expensesByCategory(monthOf: date(16)).map(\.category), ["Rent", "Food", "Transport"])   // budgeted-but-empty included
+        XCTAssertEqual(t.expenseCategories.prefix(2), ["Food", "Rent"])                                       // most used first
+        XCTAssertEqual(t.moneyByMonth(months: 2, now: date(16)).map(\.spent), [800, 17000])
+        XCTAssertNil(TrackStore(fileURL: dir.appendingPathComponent("empty.json"), calendar: calendar).savingsRate(monthOf: date(16)))
+        let again = TrackStore(fileURL: url, calendar: calendar)
+        XCTAssertEqual(again.budgets["Food"], 6000)
+        again.setBudget(0, category: "Transport")
+        XCTAssertNil(again.budgets["Transport"])
+        again.deleteExpense(id: again.expenses[0].id)
+        XCTAssertEqual(again.expenses.count, 3)
+    }
+}
