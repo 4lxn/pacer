@@ -27,8 +27,7 @@ final class WardrobeStore {
     private let calendar: Calendar
 
     static var defaultURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("wardrobe.json")
+        AppFiles.url("wardrobe.json")
     }
 
     init(fileURL: URL = WardrobeStore.defaultURL, calendar: Calendar = .current) {

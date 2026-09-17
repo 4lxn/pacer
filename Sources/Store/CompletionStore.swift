@@ -16,8 +16,7 @@ final class CompletionStore {
     private let calendar: Calendar
 
     static var defaultURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("completions.json")
+        AppFiles.url("completions.json")
     }
 
     init(fileURL: URL = CompletionStore.defaultURL, calendar: Calendar = .current) {

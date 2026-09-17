@@ -39,8 +39,7 @@ final class TrackStore {
     private let calendar: Calendar
 
     static var defaultURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("track.json")
+        AppFiles.url("track.json")
     }
 
     init(fileURL: URL = TrackStore.defaultURL, calendar: Calendar = .current) {

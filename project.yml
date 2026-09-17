@@ -39,11 +39,17 @@ targets:
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Pick a photo of a garment to add it to your closet."
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1"
+    dependencies:
+      - target: AutopilotoWidget
+        embed: true
     info:
       path: Info.plist
       properties:
         BGTaskSchedulerPermittedIdentifiers: [com.alan.autopiloto.rearm]
         UIBackgroundModes: [fetch]
+        CFBundleURLTypes:
+          - CFBundleURLName: com.alan.autopiloto
+            CFBundleURLSchemes: [autopiloto]
     entitlements:
       path: Autopiloto.entitlements
       properties:
@@ -51,6 +57,42 @@ targets:
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access: []
         com.apple.developer.applesignin: [Default]
+        com.apple.security.application-groups: [group.com.alan.autopiloto]
+  AutopilotoWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widget
+      # Shared with the app: models + the JSON stores the widget reads.
+      - path: Sources/Models/Block.swift
+      - path: Sources/Models/BlockStatus.swift
+      - path: Sources/Models/DayOverrides.swift
+      - path: Sources/Models/DayTimeline.swift
+      - path: Sources/Models/WorkoutMatch.swift
+      - path: Sources/Store/AppFiles.swift
+      - path: Sources/Store/JSONFile.swift
+      - path: Sources/Store/PlanStore.swift
+      - path: Sources/Store/CompletionStore.swift
+      - path: Sources/Store/DayStore.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alan.autopiloto.widget
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Autopiloto
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "3"
+        CODE_SIGN_ENTITLEMENTS: AutopilotoWidget.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
+    info:
+      path: Widget/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: AutopilotoWidget.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.alan.autopiloto]
   AutopilotoTests:
     type: bundle.unit-test
     platform: iOS

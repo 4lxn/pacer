@@ -23,8 +23,7 @@ final class CoachChatStore {
     private let fileURL: URL
 
     static var defaultURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("chat.json")
+        AppFiles.url("chat.json")
     }
 
     init(fileURL: URL = CoachChatStore.defaultURL) {

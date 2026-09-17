@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 struct RootView: View {
     @Bindable var store: CompletionStore
@@ -40,7 +41,11 @@ struct RootView: View {
             OnboardingView { blocks, dayEnd in plan.replace(with: blocks); days.dayEnd = dayEnd }
         }
         .onChange(of: plan.blocks) { _, blocks in
+            WidgetCenter.shared.reloadAllTimelines()
             Task { await NotificationScheduler.register(blocks) }
+        }
+        .onOpenURL { url in
+            if url.host == "today" { selectedTab = "today" }
         }
     }
 }
