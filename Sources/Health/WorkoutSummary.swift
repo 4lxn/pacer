@@ -13,8 +13,72 @@ struct WorkoutSummary: Identifiable, Hashable, Sendable {
     let distanceMeters: Double?
     let kcal: Double?
     let source: String
+    var avgHeartRate: Double? = nil
 
     var duration: TimeInterval { end.timeIntervalSince(start) }
+
+    /// min/km for anything with distance.
+    var paceMinPerKm: Double? {
+        guard let m = distanceMeters, m > 500 else { return nil }
+        return duration / 60 / (m / 1000)
+    }
+
+    static func pace(_ minPerKm: Double) -> String {
+        let total = Int((minPerKm * 60).rounded())
+        return String(format: "%d:%02d /km", total / 60, total % 60)
+    }
+}
+
+/// One week of training, for the 8-week chart.
+struct WeekBar: Identifiable, Equatable {
+    let weekStart: Date
+    var runMinutes = 0
+    var strengthMinutes = 0
+    var otherMinutes = 0
+    var runKilometers = 0.0
+    var lifts = 0
+    var id: Date { weekStart }
+
+    /// Oldest first, `weeks` entries ending with the current week; empty weeks included.
+    static func make(_ workouts: [WorkoutSummary], weeks: Int, now: Date, calendar: Calendar) -> [WeekBar] {
+        guard let thisWeek = calendar.dateInterval(of: .weekOfYear, for: now)?.start else { return [] }
+        var bars: [WeekBar] = (0..<weeks).reversed().compactMap { offset in
+            calendar.date(byAdding: .weekOfYear, value: -offset, to: thisWeek).map { WeekBar(weekStart: $0) }
+        }
+        for w in workouts {
+            guard let start = calendar.dateInterval(of: .weekOfYear, for: w.start)?.start,
+                  let i = bars.firstIndex(where: { $0.weekStart == start }) else { continue }
+            let minutes = Int(w.duration / 60)
+            switch w.activity {
+            case .run: bars[i].runMinutes += minutes; bars[i].runKilometers += (w.distanceMeters ?? 0) / 1000
+            case .strength: bars[i].strengthMinutes += minutes; bars[i].lifts += 1
+            default: bars[i].otherMinutes += minutes
+            }
+        }
+        return bars
+    }
+}
+
+enum WeightStats {
+    /// Trailing 7-day average at each sample (by date, not by count).
+    static func movingAverage(_ samples: [WeightSample], days: Int = 7, calendar: Calendar) -> [WeightSample] {
+        samples.map { s in
+            let from = calendar.date(byAdding: .day, value: -(days - 1), to: calendar.startOfDay(for: s.date)) ?? s.date
+            let window = samples.filter { $0.date >= from && $0.date <= s.date }
+            return WeightSample(date: s.date, kg: window.map(\.kg).reduce(0, +) / Double(window.count))
+        }
+    }
+
+    /// Change between the latest 7-day average and the one a week earlier; nil without enough data.
+    static func weeklyChange(_ samples: [WeightSample], now: Date, calendar: Calendar) -> Double? {
+        func avg(endingAt end: Date) -> Double? {
+            let from = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: end))!
+            let w = samples.filter { $0.date >= from && $0.date <= end }.map(\.kg)
+            return w.isEmpty ? nil : w.reduce(0, +) / Double(w.count)
+        }
+        guard let latest = avg(endingAt: now), let weekAgo = calendar.date(byAdding: .day, value: -7, to: now), let earlier = avg(endingAt: weekAgo) else { return nil }
+        return latest - earlier
+    }
 }
 
 extension WorkoutMatch {

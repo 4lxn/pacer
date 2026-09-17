@@ -59,3 +59,42 @@ final class WorkoutSummaryTests: XCTestCase {
         XCTAssertEqual(DayLogic.autoCompletions([study], workouts: [workout(.run, day: 16)], studyMinutesToday: 0, now: now, completed: [], calendar: calendar), [])
     }
 }
+
+final class TrainDepthTests: XCTestCase {
+    private let calendar: Calendar = {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "America/Mexico_City")!
+        return c
+    }()
+    private func date(_ d: Int, _ h: Int = 12) -> Date { calendar.date(from: DateComponents(year: 2026, month: 9, day: d, hour: h))! }
+    private func run(_ d: Int, minutes: Double, km: Double) -> WorkoutSummary {
+        WorkoutSummary(id: UUID(), activity: .run, start: date(d), end: date(d).addingTimeInterval(minutes * 60), distanceMeters: km * 1000, kcal: nil, source: "Garmin")
+    }
+
+    func testWeekBarsCoverEightWeeksOldestFirst() {
+        let lift = WorkoutSummary(id: UUID(), activity: .strength, start: date(15), end: date(15).addingTimeInterval(3600), distanceMeters: nil, kcal: nil, source: "Hevy")
+        let bars = WeekBar.make([run(16, minutes: 30, km: 5), run(9, minutes: 40, km: 7), lift], weeks: 8, now: date(16), calendar: calendar)
+        XCTAssertEqual(bars.count, 8)
+        XCTAssertEqual(bars.last?.runMinutes, 30)
+        XCTAssertEqual(bars.last?.lifts, 1)
+        XCTAssertEqual(bars.last?.strengthMinutes, 60)
+        XCTAssertEqual(bars[6].runKilometers, 7)
+        XCTAssertEqual(bars.first?.runMinutes, 0)
+        XCTAssertLessThan(bars[0].weekStart, bars[1].weekStart)
+    }
+
+    func testPaceAndWeightStats() {
+        let r = run(16, minutes: 30, km: 6)
+        XCTAssertEqual(r.paceMinPerKm!, 5, accuracy: 0.001)
+        XCTAssertEqual(WorkoutSummary.pace(5.5), "5:30 /km")
+        XCTAssertNil(WorkoutSummary(id: UUID(), activity: .strength, start: date(1), end: date(1), distanceMeters: nil, kcal: nil, source: "").paceMinPerKm)
+
+        let samples = (1...16).map { WeightSample(date: date($0, 8), kg: 75 - Double($0) * 0.1) }   // -0.1 kg/day
+        let avg = WeightStats.movingAverage(samples, calendar: calendar)
+        XCTAssertEqual(avg.count, 16)
+        XCTAssertEqual(avg[0].kg, 74.9, accuracy: 0.001)                          // one sample in the window
+        XCTAssertEqual(avg[6].kg, (74.9 + 74.3) / 2, accuracy: 0.001)             // days 1…7
+        XCTAssertEqual(WeightStats.weeklyChange(samples, now: date(16), calendar: calendar)!, -0.7, accuracy: 0.001)
+        XCTAssertNil(WeightStats.weeklyChange([], now: date(16), calendar: calendar))
+    }
+}
