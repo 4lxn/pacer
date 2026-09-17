@@ -105,3 +105,26 @@ final class LifeDepthTests: XCTestCase {
         XCTAssertEqual(TrackStore(fileURL: dir.appendingPathComponent("track.json"), calendar: calendar).monthlyIncomeGoal, 30000)
     }
 }
+
+@MainActor
+final class FocusSubjectsTests: XCTestCase {
+    func testSubjectsAdoptTopicsRenameAndExtend() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("track.json")
+        let t = TrackStore(fileURL: url)
+        t.addSession(start: .now.addingTimeInterval(-3600), minutes: 30, topic: "Swift")
+        let again = TrackStore(fileURL: url)
+        XCTAssertEqual(again.subjects.map(\.name), ["Swift"])        // adopted from the session topic
+        var swift = again.subjects[0]; swift.name = "SwiftUI"; swift.weeklyGoalMinutes = 120
+        again.upsertSubject(swift)
+        XCTAssertEqual(again.sessions[0].topic, "SwiftUI")             // sessions follow the rename
+        XCTAssertEqual(again.minutes(subject: "swiftui", weekOf: .now), 30)
+        again.startStudy(topic: "SwiftUI", at: .now, focusMinutes: 25)
+        let before = again.runningUntil!
+        again.extendFocus(by: 5, now: .now)
+        XCTAssertEqual(again.runningUntil!.timeIntervalSince(before), 300, accuracy: 2)
+        again.deleteSubject(id: swift.id)
+        XCTAssertTrue(again.subjects.isEmpty)
+    }
+}

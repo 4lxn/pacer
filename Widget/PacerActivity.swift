@@ -40,3 +40,29 @@ struct MarkDoneIntent: LiveActivityIntent {
 extension Notification.Name {
     static let pacerMarkDone = Notification.Name("com.alan.autopiloto.markDone")
 }
+
+
+/// A focus session: subject, when it started, when the focus target ends (nil = open).
+struct FocusActivityAttributes: ActivityAttributes {
+    struct ContentState: Codable, Hashable {
+        var subject: String
+        var start: Date
+        var until: Date?
+        var todayMinutes: Int
+    }
+    var startedAt: Date = .now
+}
+
+struct StopFocusIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Stop focus"
+    static let isDiscoverable = false
+    init() {}
+    func perform() async throws -> some IntentResult {
+        NotificationCenter.default.post(name: .pacerStopFocus, object: nil)
+        return .result()
+    }
+}
+
+extension Notification.Name {
+    static let pacerStopFocus = Notification.Name("com.alan.autopiloto.stopFocus")
+}
