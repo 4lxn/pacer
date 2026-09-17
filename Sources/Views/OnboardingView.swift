@@ -3,9 +3,11 @@ import SwiftUI
 /// First launch: wake and sleep times build a starter plan, the notification permission, then five
 /// short questions that become the Coach profile. Every step can be skipped.
 struct OnboardingView: View {
-    /// Blocks, the day end (sleep time, clamped to the calendar day) and the sections to show.
-    let onFinish: ([Block], DateComponents, [AppSection]) -> Void
+    /// Blocks, the day end (sleep time, clamped to the calendar day), the sections to show and Home if pinned.
+    let onFinish: ([Block], DateComponents, [AppSection], Place?) -> Void
     @State private var picked: Set<AppSection> = Set(SectionStore.defaultEnabled)
+    @State private var home: Place?
+    @State private var locating = false
 
     @State private var wake = Calendar.current.date(bySettingHour: 7, minute: 30, second: 0, of: .now) ?? .now
     @State private var sleep = Calendar.current.date(bySettingHour: 23, minute: 0, second: 0, of: .now) ?? .now
@@ -15,8 +17,8 @@ struct OnboardingView: View {
 
     private let calendar = Calendar.current
     private var questionCount: Int { CoachProfile.questions.count }
-    /// 0 times · 1 notifications · 2 sections · 3 coach intro · 4…(4+n-1) questions · last done
-    private static let firstQuestion = 4
+    /// 0 times · 1 notifications · 2 sections · 3 home · 4 coach intro · 5…(5+n-1) questions · last done
+    private static let firstQuestion = 5
     private var totalSteps: Int { Self.firstQuestion + questionCount + 1 }
     private var isQuestion: Bool { step >= Self.firstQuestion && step < Self.firstQuestion + questionCount }
     private var question: CoachProfile.Question? { isQuestion ? CoachProfile.questions[step - Self.firstQuestion] : nil }
@@ -32,7 +34,8 @@ struct OnboardingView: View {
                     case 0: timesStep
                     case 1: notificationsStep
                     case 2: sectionsStep
-                    case 3: coachIntroStep
+                    case 3: homeStep
+                    case 4: coachIntroStep
                     case totalSteps - 1: doneStep
                     default: questionStep
                     }
@@ -105,6 +108,37 @@ struct OnboardingView: View {
             .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
             primary("Next") { advance() }
         }
+    }
+
+    private var homeStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            title("Where's home?", "Pacer keeps travel time free between places and tells you when to leave. Pin home now; add your office or gym later in Settings → Places.")
+            VStack(alignment: .leading, spacing: 10) {
+                if let home, home.isPinned {
+                    Label(home.note.isEmpty ? "Home pinned" : home.note, systemImage: "mappin.circle.fill").foregroundStyle(.green)
+                } else {
+                    Button {
+                        Task { await pinHome() }
+                    } label: {
+                        HStack { Label("Use my current location", systemImage: "location.fill"); if locating { Spacer(); ProgressView() } }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.glass)
+                    .disabled(locating)
+                }
+            }
+            .padding(16)
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+            primary(home?.isPinned == true ? "Next" : "Skip for now") { advance() }
+        }
+    }
+
+    private func pinHome() async {
+        locating = true
+        defer { locating = false }
+        guard let coord = await LocationOnce().request() else { return }
+        let address = (try? await TravelEstimator.geocode("\(coord.latitude), \(coord.longitude)"))?.1 ?? "Current location"
+        home = Place(id: Place.homeID, name: "Home", note: address, latitude: coord.latitude, longitude: coord.longitude)
     }
 
     private var coachIntroStep: some View {
@@ -189,6 +223,6 @@ struct OnboardingView: View {
         let w = calendar.dateComponents([.hour, .minute], from: wake)
         let s = calendar.dateComponents([.hour, .minute], from: sleep)
         let wake = DateComponents.hm(w.hour ?? 7, w.minute ?? 30), sleep = DateComponents.hm(s.hour ?? 23, s.minute ?? 0)
-        onFinish(Plan.starter(wake: wake, sleep: sleep), DayStore.dayEnd(fromSleep: sleep, wake: wake), SectionStore.defaultOrder.filter { picked.contains($0) || $0.isCore })
+        onFinish(Plan.starter(wake: wake, sleep: sleep), DayStore.dayEnd(fromSleep: sleep, wake: wake), SectionStore.defaultOrder.filter { picked.contains($0) || $0.isCore }, home)
     }
 }

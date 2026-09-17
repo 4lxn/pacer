@@ -22,12 +22,18 @@ struct WardrobeView: View {
         var garments: [Garment]
     }
 
+    private let tint = AppSection.closet.tint
+
     var body: some View {
-        List {
-            outfitSection
-            laundrySection
-            closetSection
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                outfitCard
+                laundryCard
+                closetGrid
+            }
+            .padding()
         }
+        .background(Color(uiColor: .systemGroupedBackground))
         .onAppear { now = .now }
         .task(id: home?.id) {
             guard let home, let la = home.latitude, let lo = home.longitude else { return }
@@ -77,100 +83,146 @@ struct WardrobeView: View {
         }
     }
 
-    // MARK: - Sections
+    // MARK: - Cards
 
-    private var outfitSection: some View {
-        Section {
+    private var outfitCard: some View {
+        let worn = wardrobe.todaysOutfit(now: now) ?? []
+        let suggestion = worn.isEmpty ? wardrobe.suggestion(now: now) : worn
+        return VStack(alignment: .leading, spacing: 14) {
+            Text(worn.isEmpty ? "TODAY'S OUTFIT" : "WEARING TODAY").font(.caption2.weight(.bold)).foregroundStyle(tint).tracking(0.5)
             if let s = weather.summary {
                 Label(s.line, systemImage: s.symbol).font(.subheadline).foregroundStyle(.secondary)
             } else if home?.isPinned != true {
                 Text("Pin Home in Settings → Places to get today's weather here.").font(.caption).foregroundStyle(.secondary)
             }
-            Picker("Weather", selection: $wardrobe.weather) {
-                ForEach(Weather.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            Picker("Style", selection: $wardrobe.formality) {
-                ForEach(Formality.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            if let worn = wardrobe.todaysOutfit(now: now), !worn.isEmpty {
-                Text("Wearing today: " + worn.map(\.name).joined(separator: ", ")).font(.subheadline)
+            if suggestion.isEmpty {
+                Text("Add a top, a bottom and shoes to get an outfit.").foregroundStyle(.secondary)
             } else {
-                let suggestion = wardrobe.suggestion(now: now)
-                if suggestion.isEmpty {
-                    Text("Add a top, a bottom and shoes to get an outfit.").foregroundStyle(.secondary)
-                } else {
-                    ForEach(suggestion) { garmentRow($0, compact: true) }
-                    Button("Wear this") { wardrobe.wear(suggestion, now: now) }.buttonStyle(.glassProminent)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(suggestion) { g in
+                            VStack(spacing: 6) {
+                                thumbnail(g, size: 84)
+                                Text(g.name).font(.caption).lineLimit(1).frame(width: 84)
+                            }
+                        }
+                    }
+                }
+                if worn.isEmpty {
+                    Button { wardrobe.wear(suggestion, now: now) } label: {
+                        Label("Wear this", systemImage: "checkmark").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 6)
+                    }
+                    .buttonStyle(.glassProminent).tint(tint)
+                    .sensoryFeedback(.success, trigger: wardrobe.outfits.count)
                 }
             }
+            HStack(spacing: 10) {
+                Picker("Weather", selection: $wardrobe.weather) {
+                    ForEach(Weather.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                Picker("Style", selection: $wardrobe.formality) {
+                    ForEach(Formality.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
+                }
+                .pickerStyle(.segmented)
+            }
             if let scanError { Text(scanError).font(.footnote).foregroundStyle(.red) }
-        } header: { Text("Today's outfit") }
+        }
+        .padding(20)
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
+        .animation(.snappy, value: wardrobe.outfits.count)
     }
 
     @ViewBuilder
-    private var laundrySection: some View {
+    private var laundryCard: some View {
         let pile = wardrobe.laundry
         if !pile.isEmpty {
-            Section {
-                ForEach(pile) { g in
-                    HStack {
-                        garmentRow(g, compact: true)
-                        Spacer()
-                        Button("Washed") { wardrobe.washed(id: g.id) }.buttonStyle(.bordered).controlSize(.small)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label("Laundry", systemImage: "washer").font(.headline)
+                    Text("\(pile.count)").font(.caption.weight(.semibold)).monospacedDigit()
+                        .padding(.horizontal, 7).padding(.vertical, 2).background(Color(uiColor: .tertiarySystemFill), in: Capsule()).foregroundStyle(.secondary)
+                    Spacer()
+                    Button("All washed") { wardrobe.washAll() }.font(.subheadline).buttonStyle(.glass).controlSize(.small)
+                }
+                FlowLayout(spacing: 8) {
+                    ForEach(pile) { g in
+                        Button { wardrobe.washed(id: g.id) } label: {
+                            Label(g.name, systemImage: "checkmark").font(.caption.weight(.medium)).lineLimit(1)
+                                .padding(.horizontal, 10).padding(.vertical, 6)
+                        }
+                        .buttonStyle(.glass).controlSize(.small)
                     }
                 }
-                Button("Everything washed") { wardrobe.washAll() }
-            } header: { Text("Laundry · \(pile.count)") }
+                Text("Tap a piece when it's washed.").font(.caption2).foregroundStyle(.tertiary)
+            }
+            .padding(16)
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
         }
     }
 
-    private var closetSection: some View {
-        Section("Closet · \(wardrobe.closet.count)") {
+    private var closetGrid: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Closet").font(.headline)
+                Text("\(wardrobe.closet.count)").font(.caption.weight(.semibold)).monospacedDigit()
+                    .padding(.horizontal, 7).padding(.vertical, 2).background(Color(uiColor: .tertiarySystemFill), in: Capsule()).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 4)
             if wardrobe.closet.isEmpty {
-                Text("Photograph your clothes — several per photo is fine — and the coach names and files them.").foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Photograph your clothes — several per photo is fine — and the coach names and files them.").foregroundStyle(.secondary)
+                    HStack {
+                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                            Button { showCamera = true } label: { Label("Take photos", systemImage: "camera") }.buttonStyle(.glassProminent).tint(tint)
+                        }
+                        PhotosPicker(selection: $pickedItems, maxSelectionCount: 10, matching: .images) { Label("Choose photos", systemImage: "photo.on.rectangle") }.buttonStyle(.glass)
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
             }
             ForEach(GarmentCategory.allCases, id: \.self) { category in
                 let items = wardrobe.closet.filter { $0.category == category }
                 if !items.isEmpty {
-                    Text(category.rawValue.capitalized).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                    ForEach(items) { g in
-                        garmentRow(g, compact: false)
-                            .swipeActions {
-                                Button(role: .destructive) { wardrobe.remove(id: g.id) } label: { Label("Delete", systemImage: "trash") }
-                                Button { wardrobe.wear([g], now: now) } label: { Label("Wear", systemImage: "tshirt") }.tint(.accentColor)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(category.rawValue.capitalized).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 12) {
+                            ForEach(items) { g in
+                                VStack(spacing: 4) {
+                                    thumbnail(g, size: 72)
+                                        .overlay(alignment: .topTrailing) {
+                                            if g.needsWash { Image(systemName: "washer.fill").font(.caption2).padding(4).background(.red, in: Circle()).foregroundStyle(.white).offset(x: 4, y: -4) }
+                                        }
+                                    Text(g.name).font(.caption2).lineLimit(1)
+                                }
+                                .contextMenu {
+                                    Button("Wear today", systemImage: "tshirt") { wardrobe.wear([g], now: now) }
+                                    if g.needsWash { Button("Washed", systemImage: "checkmark") { wardrobe.washed(id: g.id) } }
+                                    Button("Delete", systemImage: "trash", role: .destructive) { wardrobe.remove(id: g.id) }
+                                }
                             }
+                        }
                     }
+                    .padding(16)
+                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
                 }
             }
         }
     }
 
-    private func garmentRow(_ g: Garment, compact: Bool) -> some View {
-        HStack(spacing: 10) {
-            thumbnail(g)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(g.name).foregroundStyle(g.needsWash ? .red : .primary)
-                if !compact {
-                    Text("\(g.color)\(g.pattern == "solid" ? "" : " \(g.pattern)") · warmth \(g.warmth) · \(g.formality.rawValue)" + (g.washAfter > 0 ? " · worn \(g.wearsSinceWash)/\(g.washAfter)" : ""))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    private func thumbnail(_ g: Garment) -> some View {
+    private func thumbnail(_ g: Garment, size: CGFloat = 36) -> some View {
         Group {
             if let url = wardrobe.imageURL(for: g), let ui = UIImage(contentsOfFile: url.path) {
                 Image(uiImage: ui).resizable().scaledToFill()
             } else {
-                Image(systemName: icon(g.category)).foregroundStyle(.secondary)
+                Image(systemName: icon(g.category)).font(.system(size: size * 0.4)).foregroundStyle(.secondary)
             }
         }
-        .frame(width: 36, height: 36)
+        .frame(width: size, height: size)
         .background(Color(uiColor: .tertiarySystemFill))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: size > 48 ? 14 : 8))
     }
 
     private func icon(_ c: GarmentCategory) -> String {

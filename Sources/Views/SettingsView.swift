@@ -86,6 +86,12 @@ struct SettingsView: View {
                     Text("Home Screen: touch and hold → Edit → Add Widget → Pacer. Lock Screen: touch and hold the Lock Screen → Customize → tap the widget area → Pacer.")
                 }
 
+                Section {
+                    ShareLink(item: DataExport.file(), preview: SharePreview("Pacer data", image: Image(systemName: "doc.zipper"))) {
+                        Label("Export my data", systemImage: "square.and.arrow.up")
+                    }
+                } footer: { Text("Every JSON file the app keeps (plan, days, food, focus, money, closet, places, chats) in one file you own.") }
+
                 Section("About") {
                     LabeledContent("Version", value: Diagnostics.version)
                     NavigationLink("Diagnostics") { DiagnosticsView(days: days, metrics: metrics, health: health, plan: plan) }
@@ -265,5 +271,33 @@ struct SectionsView: View {
                 Toggle("", isOn: Binding(get: { on }, set: { sections.set(s, on: $0) })).labelsHidden()
             }
         }
+    }
+}
+
+
+/// One JSON document with every store's file, for backups and moving phones.
+enum DataExport {
+    @MainActor
+    static func file() -> URL {
+        var bundle: [String: Any] = ["exportedAt": ISO8601DateFormatter().string(from: .now), "app": "Pacer \(Diagnostics.version)"]
+        let dir = AppFiles.directory
+        if let names = try? FileManager.default.contentsOfDirectory(atPath: dir.path) {
+            for name in names where name.hasSuffix(".json") {
+                if let data = try? Data(contentsOf: dir.appendingPathComponent(name)), let json = try? JSONSerialization.jsonObject(with: data) {
+                    bundle[String(name.dropLast(5))] = json
+                }
+            }
+            let chats = dir.appendingPathComponent("chats")
+            if let chatFiles = try? FileManager.default.contentsOfDirectory(atPath: chats.path) {
+                var all: [String: Any] = [:]
+                for f in chatFiles where f.hasSuffix(".json") {
+                    if let data = try? Data(contentsOf: chats.appendingPathComponent(f)), let json = try? JSONSerialization.jsonObject(with: data) { all[String(f.dropLast(5))] = json }
+                }
+                bundle["chatMessages"] = all
+            }
+        }
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent("pacer-export.json")
+        if let data = try? JSONSerialization.data(withJSONObject: bundle, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: out) }
+        return out
     }
 }
