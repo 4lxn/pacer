@@ -59,6 +59,12 @@ struct SettingsView: View {
                     }
                 }
 
+                Section {
+                    Label("Now / Next on your Home Screen", systemImage: "square.grid.2x2")
+                } footer: {
+                    Text("Touch and hold the Home Screen → Edit → Add Widget → Pacer. It shows what's on now, what's next and your progress.")
+                }
+
                 Section("About") {
                     LabeledContent("Version", value: Diagnostics.version)
                     NavigationLink("Diagnostics") { DiagnosticsView(days: days, metrics: metrics, health: health, plan: plan) }

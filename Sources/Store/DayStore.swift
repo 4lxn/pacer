@@ -48,6 +48,28 @@ final class DayStore {
         JSONFile.save(overrides, to: overridesURL)
     }
 
+    func setNote(_ note: String, blockID: String, dayKey: String) {
+        var o = override(dayKey: dayKey)
+        let clean = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        if clean.isEmpty { o.notes.removeValue(forKey: blockID) } else { o.notes[blockID] = clean }
+        setOverride(o, dayKey: dayKey)
+    }
+
+    func addExtra(_ block: Block, dayKey: String) {
+        var o = override(dayKey: dayKey)
+        o.extras.removeAll { $0.id == block.id }
+        o.extras.append(block)
+        setOverride(o, dayKey: dayKey)
+    }
+
+    func removeExtra(_ id: String, dayKey: String) {
+        var o = override(dayKey: dayKey)
+        o.extras.removeAll { $0.id == id }
+        o.moved.removeValue(forKey: id)
+        o.notes.removeValue(forKey: id)
+        setOverride(o, dayKey: dayKey)
+    }
+
     func setUndo(_ record: UndoRecord?) {
         undo = record
         if let record { JSONFile.save(record, to: undoURL) } else { try? FileManager.default.removeItem(at: undoURL) }
