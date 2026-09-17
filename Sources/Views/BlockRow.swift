@@ -16,9 +16,11 @@ struct BlockRow: View {
                 Image(systemName: status == .done ? "checkmark.circle.fill" : status == .skipped ? "minus.circle" : "circle")
                     .font(.title3)
                     .foregroundStyle(status == .done ? Color.accentColor : .secondary)
+                    .contentTransition(.symbolEffect(.replace.downUp))
+                    .symbolEffect(.bounce, value: status == .done)
                 Text(timeText)
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline.monospacedDigit().weight(status == .missed ? .semibold : .regular))
+                    .foregroundStyle(status == .missed ? .red : .secondary)
                     .frame(width: 48, alignment: .leading)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
@@ -68,21 +70,19 @@ struct BlockRow: View {
     }
 
     private var kindChip: some View {
-        Text(status == .skipped ? "skipped" : moved ? "moved" : block.kind.rawValue)
+        let text = status == .skipped ? "skipped" : status == .missed ? "missed" : block.kind.rawValue
+        return Text(text)
             .font(.caption2.weight(.medium))
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(Color(uiColor: .tertiarySystemFill), in: Capsule())
-            .foregroundStyle(.secondary)
+            .background(status == .missed ? Color.red.opacity(0.12) : Color(uiColor: .tertiarySystemFill), in: Capsule())
+            .foregroundStyle(status == .missed ? .red : .secondary)
+            .contentTransition(.interpolate)
     }
 
     @ViewBuilder
     private var rowBackground: some View {
-        switch status {
-        case .current: Color.accentColor.opacity(0.14)
-        case .missed: Color.red.opacity(0.10)
-        default: Color.clear
-        }
+        if status == .current { Color.accentColor.opacity(0.14) } else { Color.clear }
     }
 
     private var accessibilityStatus: String {

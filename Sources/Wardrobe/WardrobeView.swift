@@ -65,7 +65,7 @@ struct WardrobeView: View {
         .overlay {
             if isScanning {
                 ProgressView(queueTotal > 1 ? "Looking at photo \(queueTotal - queue.count) / \(queueTotal)…" : "Looking at the photo…")
-                    .padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
             }
         }
     }

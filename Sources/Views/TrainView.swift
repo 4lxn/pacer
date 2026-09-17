@@ -171,6 +171,6 @@ struct TrainView: View {
         VStack(alignment: .leading, spacing: 10) { content() }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
     }
 }

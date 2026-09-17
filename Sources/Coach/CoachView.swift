@@ -22,7 +22,7 @@ struct CoachView: View {
     @Namespace private var glass
 
     private let calendar = Calendar.current
-    private let suggestions = ["¿Qué toca ahora?", "¿Qué ceno hoy?", "¿Qué compro?", "Agrega 1 kg de arroz", "Mueve estudio a las 5 pm", "¿Qué me pongo?"]
+    private let suggestions = ["What's next?", "What should I have for dinner?", "What do I need to buy?", "Add 1 kg of rice", "Move study to 5 pm", "What should I wear?"]
 
     private var canAsk: Bool {
         if useOwnKey { return !apiKey.isEmpty }
