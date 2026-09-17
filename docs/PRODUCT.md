@@ -172,35 +172,35 @@ Accepted: HealthKit background delivery · Now/Next widget (systemSmall) · on-d
 ## Implementation Tasks
 Synthesized from this review's findings. Each task derives from a specific finding above. Run with Claude Code; checkbox as you ship.
 
-- [ ] **T1 (P1, human: ~1 day / CC: ~45 min)** — PR1 notifications — Per-block `checkIn` flag, one-shot check-ins at end+5 (today+tomorrow), category `CHECK_IN` with Done/Skip, `dayKey` in userInfo, `notification.date` for Done, 4-method center wrapper, ≤ 64 test
+- [x] **T1 (P1, human: ~1 day / CC: ~45 min)** — PR1 notifications — Per-block `checkIn` flag, one-shot check-ins at end+5 (today+tomorrow), category `CHECK_IN` with Done/Skip, `dayKey` in userInfo, `notification.date` for Done, 4-method center wrapper, ≤ 64 test
   - Surfaced by: Section 1 (1C→CM2), CM3, spec round 1 #9/#29
   - Files: Sources/Models/Block.swift, Sources/Notifications/NotificationScheduler.swift, NotificationDelegate.swift, Views/BlockEditor.swift, Tests/SchedulerTests.swift
   - Verify: `xcodebuild test`; simctl push a `CHECK_IN` payload → Done marks the right day
-- [ ] **T2 (P1, human: ~half day / CC: ~30 min)** — PR1 stores — `.skipped` per day in CompletionStore, `BlockStatus.skipped`, N excludes skipped, `JSONFile.load/save` with `lastPersistenceError` + Today banner, never overwrite undecodable files, `settings.json` with `dayEnd` (clamped, sleep<wake rule)
+- [x] **T2 (P1, human: ~half day / CC: ~30 min)** — PR1 stores — `.skipped` per day in CompletionStore, `BlockStatus.skipped`, N excludes skipped, `JSONFile.load/save` with `lastPersistenceError` + Today banner, never overwrite undecodable files, `settings.json` with `dayEnd` (clamped, sleep<wake rule)
   - Surfaced by: Section 2 (2A), spec round 3 #1/#6, outside voice #10
   - Files: Sources/Store/*, Sources/Models/BlockStatus.swift, Views/DayView.swift, Tests/CompletionStoreTests.swift
   - Verify: read-only URL test; `.bad` rename test; legacy array file loads
-- [ ] **T3 (P1, human: ~2 h / CC: ~15 min)** — PR1 product — Remove `CoachContext.training` seed and personal labels from `Plan.blocks`; starter never emits post-midnight blocks; onboarding step 2 teaches the long-press
+- [x] **T3 (P1, human: ~2 h / CC: ~15 min)** — PR1 product — Remove `CoachContext.training` seed and personal labels from `Plan.blocks`; starter never emits post-midnight blocks; onboarding step 2 teaches the long-press
   - Surfaced by: outside voice #4, #10, #15; PRODUCT.md roadmap item 4
   - Files: Sources/Coach/CoachContext.swift, Sources/Models/Plan.swift, Views/OnboardingView.swift
   - Verify: grep for "Minoxidil|retatrutide" in Sources returns nothing; starter test with sleep 00:30
-- [ ] **T4 (P1, human: ~1.5 days / CC: ~1 h)** — PR2 replan — `Replanner.replan/place` (pure) + `DayOverrides` + `undo.json` + `DayMutator` + `REPLAN`/`UNDO` actions + Replan/Skip on missed NowCard and rows + `DayLogic.effectivePlan`
+- [x] **T4 (P1, human: ~1.5 days / CC: ~1 h)** — PR2 replan — `Replanner.replan/place` (pure) + `DayOverrides` + `undo.json` + `DayMutator` + `REPLAN`/`UNDO` actions + Replan/Skip on missed NowCard and rows + `DayLogic.effectivePlan`
   - Surfaced by: Section 1 (1A, 1D), D7, spec rounds 2–3 (#8, #9, #4, #10 of r3)
   - Files: Sources/Models/Replanner.swift, DayOverrides.swift, Sources/Store/DayOverridesStore.swift, DayMutator.swift, Views/NowCard.swift, BlockRow.swift, Tests/ReplannerTests.swift
   - Verify: 12 Replanner cases; delegate test: Replan on deleted block is a no-op
-- [ ] **T5 (P2, human: ~2 h / CC: ~15 min)** — PR2 coach — `move_today` (→ `Replanner.place`), `skip_today`, `undo_replan`; `update_block` marked permanent; snapshot uses effective plan; kill-criterion counters
+- [x] **T5 (P2, human: ~2 h / CC: ~15 min)** — PR2 coach — `move_today` (→ `Replanner.place`), `skip_today`, `undo_replan`; `update_block` marked permanent; snapshot uses effective plan; kill-criterion counters
   - Surfaced by: spec round 1 #33, outside voice #7, #16
   - Files: Sources/Coach/CoachTools.swift, CoachContext.swift, Tests/CoachAgentTests.swift
   - Verify: tool executor test walks every definition
-- [ ] **T6 (P2, human: ~2 days / CC: ~1 h)** — PR3 widget — App Group entitlement on both targets, `defaultURL` → group container for the 5 day files, `AutopilotoWidget` target (systemSmall, 2-day timeline, 5 states, deep link), `WorkoutMatch` + `clock` moved to shared code
+- [x] **T6 (P2, human: ~2 days / CC: ~1 h)** — PR3 widget — App Group entitlement on both targets, `defaultURL` → group container for the 5 day files, `AutopilotoWidget` target (systemSmall, 2-day timeline, 5 states, deep link), `WorkoutMatch` + `clock` moved to shared code
   - Surfaced by: D5.4, 1B→CM4, spec round 3 #5/#9, 1E
   - Files: project.yml, Sources/Models/*, Widget/*, Sources/Store/*
   - Verify: widget renders 5 states in the simulator; Alan copies his files once before installing
-- [ ] **T7 (P2, human: ~1.5 days / CC: ~1 h)** — PR4 health + settings — `healthkit.background-delivery` entitlement, `HKObserverQuery` in AppDelegate (completion always called), Settings sheet (Check-ins toggle, profile), Diagnostics (permission, pending/64, last re-arm, last HK delivery, last persistence error, counters, Copy report), `MetricsStore` + "Your week"
+- [x] **T7 (P2, human: ~1.5 days / CC: ~1 h)** — PR4 health + settings — `healthkit.background-delivery` entitlement, `HKObserverQuery` in AppDelegate (completion always called), Settings sheet (Check-ins toggle, profile), Diagnostics (permission, pending/64, last re-arm, last HK delivery, last persistence error, counters, Copy report), `MetricsStore` + "Your week"
   - Surfaced by: D5.1, 8A, CM5, spec round 2 #17, outside voice #14
   - Files: project.yml, Sources/AutopilotoApp.swift, Sources/Health/HealthStore.swift, Sources/Metrics/MetricsStore.swift, Views/SettingsView.swift, DiagnosticsView.swift
   - Verify: on device — Garmin run closes Run at first unlock; Diagnostics shows counts
-- [ ] **T8 (P3, human: ~half day / CC: ~30 min)** — PR5 name + docs — Check "Pacer" availability in App Store Connect, rename display/App Store name/README/docs (bundle id unchanged), `docs/ARCHITECTURE.md` with the diagrams above, update README notification/network claims and the simctl payload
+- [x] **T8 (P3, human: ~half day / CC: ~30 min)** — PR5 name + docs — Check "Pacer" availability in App Store Connect, rename display/App Store name/README/docs (bundle id unchanged), `docs/ARCHITECTURE.md` with the diagrams above, update README notification/network claims and the simctl payload
   - Surfaced by: naming decision, TODO-1, spec round 3 #12, outside voice #9
   - Files: project.yml, README.md, docs/*
   - Verify: `grep -ri autopiloto README.md docs/` returns only historical mentions
@@ -222,3 +222,11 @@ Synthesized from this review's findings. Each task derives from a specific findi
 - **VERDICT:** CEO CLEARED — eng review required before implementation (`/plan-eng-review` on PR1's plan).
 
 NO UNRESOLVED DECISIONS
+
+
+## Status 2026-09-16 (evening)
+
+PR1–PR6 merged (#13–#19): check-ins, replan + undo, widget over an App Group, Health background
+delivery, Settings + Diagnostics + on-device metrics, Pacer name + icon, Today polish. Build 1.0 (4)
+uploaded to TestFlight. Open: T9 design review; Paid Apps agreement → Active before the sandbox
+subscription can be tested; the Replan kill criterion is read from Diagnostics after 2 weeks.
