@@ -88,6 +88,7 @@ async function handleCoach(req, res) {
     return json(res, 400, { error: "messages[] or question required" });
   }
 
+  const stream = body.stream === true && Array.isArray(body.messages);
   const payload = {
     model: MODEL,
     max_tokens: body.image ? 512 : Number(MAX_TOKENS),
@@ -96,6 +97,7 @@ async function handleCoach(req, res) {
     fallbacks: "default",
   };
   if (tools) payload.tools = tools;
+  if (stream) payload.stream = true;
 
   const upstream = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -107,6 +109,17 @@ async function handleCoach(req, res) {
     },
     body: JSON.stringify(payload),
   });
+  if (stream && upstream.ok) {
+    // Pipe Anthropic's SSE straight through; one extra event carries the day's remaining calls.
+    res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
+    res.write(`event: remaining\ndata: ${JSON.stringify({ remaining })}\n\n`);
+    try {
+      for await (const chunk of upstream.body) res.write(chunk);
+    } catch (e) {
+      console.error("stream", e.message);
+    }
+    return res.end();
+  }
   const data = await upstream.json();
   if (!upstream.ok) {
     console.error("anthropic", upstream.status, data?.error?.message);
