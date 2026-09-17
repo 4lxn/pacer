@@ -10,8 +10,8 @@ struct AutopilotoApp: App {
     var body: some Scene {
         WindowGroup {
             RootView(store: appDelegate.store, plan: appDelegate.plan, days: appDelegate.days, mutator: appDelegate.mutator,
-                     health: appDelegate.health, food: appDelegate.food, track: appDelegate.track, account: appDelegate.account,
-                     wardrobe: appDelegate.wardrobe, agent: appDelegate.agent)
+                     metrics: appDelegate.metrics, health: appDelegate.health, food: appDelegate.food, track: appDelegate.track,
+                     account: appDelegate.account, wardrobe: appDelegate.wardrobe, agent: appDelegate.agent)
         }
     }
 }
@@ -30,7 +30,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     let account = CoachAccount()
     let wardrobe = WardrobeStore()
     let days = DayStore()
-    lazy var mutator = DayMutator(plan: plan, completions: store, days: days)
+    let metrics = MetricsStore()
+    lazy var mutator = DayMutator(plan: plan, completions: store, days: days, metrics: metrics)
     lazy var agent = CoachAgent(
         chat: CoachChatStore(),
         tools: CoachTools(plan: plan, completions: store, food: food, wardrobe: wardrobe, health: health, track: track, mutator: mutator)
@@ -63,7 +64,23 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             task.expirationHandler = { work.cancel(); task.setTaskCompleted(success: false) }
         }
         Self.scheduleRearm()
+
+        // A workout synced into Health closes its block even if the app never opens.
+        health.startObserving { [weak self] in
+            guard let self else { return }
+            metrics.markHealthDelivery()
+            await autoCloseFromHealth()
+        }
         return true
+    }
+
+    /// Shared by the Health observer and the Today screen.
+    func autoCloseFromHealth() async {
+        let now = Date.now
+        if health.isAvailable { await health.refresh(now: now) }
+        mutator.now = { .now }
+        mutator.autoClose(workouts: health.workouts, studyMinutesToday: track.studyMinutes(on: now), on: now)
+        await mutator.flush()
     }
 
     func applicationDidEnterBackground(_ application: UIApplication) {

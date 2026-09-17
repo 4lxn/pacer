@@ -28,7 +28,7 @@ final class DayMutatorTests: XCTestCase {
         days = DayStore(directory: dir, fallbackDayEnd: .hm(23, 0))
         fake = FakeCenter()
         clock = date(16, 14)   // Wednesday, 14:00: Lunch (b09 13:00–13:40) is missed
-        mutator = DayMutator(plan: plan, completions: store, days: days, calendar: calendar, now: { [self] in clock }, center: fake.client)
+        mutator = DayMutator(plan: plan, completions: store, days: days, metrics: MetricsStore(fileURL: dir.appendingPathComponent("metrics.json"), calendar: calendar), calendar: calendar, now: { [self] in clock }, center: fake.client)
     }
 
     func testReplanMovesRecordsUndoAndArmsStart() async {

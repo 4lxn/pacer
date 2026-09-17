@@ -82,6 +82,7 @@ enum NotificationScheduler {
         completed: (String) -> Set<String>,
         skipped: (String) -> Set<String>,
         movedIDs: (String) -> Set<String> = { _ in [] },
+        checkIns: Bool = true,
         calendar: Calendar = .current
     ) -> [UNNotificationRequest] {
         var requests: [(Date, UNNotificationRequest)] = []
@@ -91,7 +92,7 @@ enum NotificationScheduler {
             let done = completed(dayKey), skip = skipped(dayKey), moved = movedIDs(dayKey)
             for block in plan(day) where block.occurs(on: day, calendar: calendar) {
                 guard !done.contains(block.id), !skip.contains(block.id) else { continue }
-                if block.checkIn, let end = block.endDate(on: day, calendar: calendar),
+                if checkIns, block.checkIn, let end = block.endDate(on: day, calendar: calendar),
                    let fire = calendar.date(byAdding: .minute, value: checkInDelayMinutes, to: end), fire > now {
                     let content = UNMutableNotificationContent()
                     content.title = "\(block.label) ended"
@@ -129,6 +130,7 @@ enum NotificationScheduler {
         completed: (String) -> Set<String>,
         skipped: (String) -> Set<String>,
         movedIDs: (String) -> Set<String> = { _ in [] },
+        checkIns: Bool = true,
         calendar: Calendar = .current,
         center: NotificationCenterClient = .live
     ) async -> Int {
@@ -136,7 +138,7 @@ enum NotificationScheduler {
         let stale = pending.filter(isOneShot)
         center.removePending(stale)
         let room = max(0, maxPending - (pending.count - stale.count))
-        let wanted = buildCheckIns(plan: plan, now: now, completed: completed, skipped: skipped, movedIDs: movedIDs, calendar: calendar)
+        let wanted = buildCheckIns(plan: plan, now: now, completed: completed, skipped: skipped, movedIDs: movedIDs, checkIns: checkIns, calendar: calendar)
         if wanted.count > room {
             log.warning("\(wanted.count) check-ins wanted, room for \(room); dropping the latest ones")
         }

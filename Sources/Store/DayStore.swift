@@ -9,9 +9,14 @@ final class DayStore {
     private(set) var overrides: [String: DayOverride] = [:]
     private(set) var undo: UndoRecord?
     /// Day end used by the replanner, ≤ 23:59. Set at onboarding from the sleep time.
-    var dayEnd: DateComponents { didSet { JSONFile.save(Settings(dayEnd: dayEnd), to: settingsURL) } }
+    var dayEnd: DateComponents { didSet { saveSettings() } }
+    /// Master switch for end-of-block check-ins (start notifications are unaffected).
+    var checkInsEnabled = true { didSet { saveSettings() } }
 
-    private struct Settings: Codable { var dayEnd: DateComponents }
+    private struct Settings: Codable {
+        var dayEnd: DateComponents
+        var checkInsEnabled: Bool?
+    }
 
     private let overridesURL: URL
     private let undoURL: URL
@@ -25,8 +30,15 @@ final class DayStore {
         settingsURL = directory.appendingPathComponent("settings.json")
         if case .loaded(let o) = JSONFile.load([String: DayOverride].self, from: overridesURL) { overrides = o }
         if case .loaded(let u) = JSONFile.load(UndoRecord.self, from: undoURL) { undo = u }
-        if case .loaded(let s) = JSONFile.load(Settings.self, from: settingsURL) { dayEnd = s.dayEnd } else { dayEnd = fallbackDayEnd }
+        if case .loaded(let s) = JSONFile.load(Settings.self, from: settingsURL) {
+            dayEnd = s.dayEnd
+            checkInsEnabled = s.checkInsEnabled ?? true
+        } else {
+            dayEnd = fallbackDayEnd
+        }
     }
+
+    private func saveSettings() { JSONFile.save(Settings(dayEnd: dayEnd, checkInsEnabled: checkInsEnabled), to: settingsURL) }
 
     func override(dayKey: String) -> DayOverride { overrides[dayKey] ?? DayOverride() }
 

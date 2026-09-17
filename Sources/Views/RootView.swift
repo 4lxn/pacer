@@ -6,6 +6,7 @@ struct RootView: View {
     @Bindable var plan: PlanStore
     @Bindable var days: DayStore
     @Bindable var mutator: DayMutator
+    @Bindable var metrics: MetricsStore
     @Bindable var health: HealthStore
     @Bindable var food: FoodStore
     @Bindable var track: TrackStore
@@ -25,7 +26,7 @@ struct RootView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            DayView(store: store, plan: plan, days: days, mutator: mutator, health: health, track: track)
+            DayView(store: store, plan: plan, days: days, mutator: mutator, metrics: metrics, health: health, track: track, account: account)
                 .tabItem { Label("Today", systemImage: "sun.max") }.tag("today")
             TrainView(health: health)
                 .tabItem { Label("Train", systemImage: "figure.run") }.tag("train")

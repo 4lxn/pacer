@@ -6,13 +6,16 @@ struct DayView: View {
     @Bindable var plan: PlanStore
     @Bindable var days: DayStore
     @Bindable var mutator: DayMutator
+    @Bindable var metrics: MetricsStore
     @Bindable var health: HealthStore
     @Bindable var track: TrackStore
+    @Bindable var account: CoachAccount
     @Environment(\.scenePhase) private var scenePhase
     @State private var now = Date.now
     @State private var notificationsDenied = false
     @State private var bannerDismissed = false
     @State private var editingPlan = false
+    @State private var showingSettings = false
     private var persistence: PersistenceState { PersistenceState.shared }
 
     private let calendar = Calendar.current
@@ -64,7 +67,13 @@ struct DayView: View {
                 }
             }
         }
-        .sheet(isPresented: $editingPlan) { PlanView(plan: plan, days: days) }
+        .sheet(isPresented: $editingPlan) { PlanView(plan: plan) }
+        .onAppear {
+            #if DEBUG
+            if CoachAccount.screenshotMode == "settings" { showingSettings = true }
+            #endif
+        }
+        .sheet(isPresented: $showingSettings) { SettingsView(days: days, metrics: metrics, health: health, account: account, plan: plan) }
         .onChange(of: track.sessions) { _, _ in Task { await autoCompleteFromHealth() } }
         .task(id: plan.needsOnboarding) {
             // Onboarding asks for the permission itself; don't double-prompt behind the cover.
@@ -88,13 +97,19 @@ struct DayView: View {
                     .monospacedDigit()
             }
             Spacer()
-            Button {
-                editingPlan = true
-            } label: {
-                Image(systemName: "slider.horizontal.3").frame(width: 24, height: 24)
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    Button { editingPlan = true } label: {
+                        Image(systemName: "slider.horizontal.3").frame(width: 24, height: 24)
+                    }
+                    .accessibilityLabel("Edit plan")
+                    Button { showingSettings = true } label: {
+                        Image(systemName: "gearshape").frame(width: 24, height: 24)
+                    }
+                    .accessibilityLabel("Settings")
+                }
+                .buttonStyle(.glass)
             }
-            .buttonStyle(.glass)
-            .accessibilityLabel("Edit plan")
         }
     }
 
@@ -216,11 +231,6 @@ struct DayView: View {
     /// A run or strength workout in Apple Health today, or 20+ min of study, closes the matching blocks.
     private func autoCompleteFromHealth() async {
         if health.isAvailable { await health.refresh(now: now, calendar: calendar) }
-        let ids = DayLogic.autoCompletions(
-            blocks, workouts: health.workouts, studyMinutesToday: track.studyMinutes(on: now),
-            now: now, completed: completed, calendar: calendar
-        )
-        for id in ids { store.markDone(id, on: now) }
-        if !ids.isEmpty { await rearmCheckIns() }
+        mutator.autoClose(workouts: health.workouts, studyMinutesToday: track.studyMinutes(on: now), on: now)
     }
 }

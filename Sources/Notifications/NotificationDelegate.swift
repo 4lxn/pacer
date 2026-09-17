@@ -33,12 +33,20 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
     }
 
     /// The effect of an action, separated from UNNotificationResponse so it can be tested.
-    func handle(_ action: Action, blockID: String?, dayKey: String, center: NotificationCenterClient = .live) async {
+    func handle(_ action: Action, blockID: String?, dayKey: String, isCheckIn: Bool = false, center: NotificationCenterClient = .live) async {
         mutator.center = center
+        if isCheckIn {
+            switch action {
+            case .done: mutator.metrics.record(.checkInDone)
+            case .skipToday: mutator.metrics.record(.checkInSkip)
+            case .replan: mutator.metrics.record(.checkInReplan)
+            default: break
+            }
+        }
         switch action {
         case .done:
             guard let blockID else { return }
-            mutator.setDone(blockID, true, dayKey: dayKey)
+            mutator.setDone(blockID, true, dayKey: dayKey, source: .notification)
         case .skipToday:
             guard let blockID else { return }
             mutator.skipToday(blockID, dayKey: dayKey, source: .notification)
@@ -66,7 +74,8 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
         let blockID = userInfo[NotificationScheduler.blockIDKey] as? String
         let action = Self.action(for: response.actionIdentifier)
         let dayKey = Self.dayKey(userInfo: userInfo, fireDate: response.notification.date, calendar: .current)
-        await handle(action, blockID: blockID, dayKey: dayKey)
+        let isCheckIn = response.notification.request.content.categoryIdentifier == NotificationScheduler.checkInCategoryID
+        await handle(action, blockID: blockID, dayKey: dayKey, isCheckIn: isCheckIn)
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
