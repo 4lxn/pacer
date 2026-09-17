@@ -119,7 +119,7 @@ struct DayView: View {
         .sheet(isPresented: $editingPlan) { PlanView(plan: plan, places: days.places.list) }
         .onAppear {
             #if DEBUG
-            if CoachAccount.screenshotMode == "settings" { showingSettings = true }
+            if CoachAccount.screenshotMode == "settings" || CoachAccount.screenshotMode == "places" { showingSettings = true }
             if CoachAccount.screenshotMode == "detail" { detail = current ?? blocks.first }
             if CoachAccount.screenshotMode == "days" { showingDays = true }
             if CoachAccount.screenshotMode == "tomorrow" { openDay = calendar.date(byAdding: .day, value: 1, to: now) }

@@ -46,7 +46,7 @@ struct CoachTools {
             "place": str("Place name from get_places; empty string = wherever the user already is"),
         ], required: ["id"]),
         tool("get_places", "The user's places (home, office, gym…) and travel minutes between them.", [:]),
-        tool("add_place", "Add or rename a place.", ["name": str(""), "note": str("Address or how to get there")], required: ["name"]),
+        tool("add_place", "Add or rename a place. With an address, Pacer pins it on Apple Maps and estimates travel times to the other pinned places.", ["name": str(""), "address": str("Street address or a searchable name"), "note": str("How to get there")], required: ["name"]),
         tool("set_travel", "Set door-to-door minutes between two places (symmetric).", [
             "from": str("Place name"), "to": str("Place name"), "minutes": ["type": "integer"],
         ], required: ["from", "to", "minutes"]),
@@ -283,8 +283,22 @@ struct CoachTools {
 
         case "add_place":
             guard let name = input["name"] as? String, !name.trimmingCharacters(in: .whitespaces).isEmpty else { return Result(output: "name is required", isError: true) }
-            mutator.days.places.upsert(Place(name: name, note: input["note"] as? String ?? ""))
-            return Result(output: "Saved place \(name)", summary: "Place: \(name)")
+            let existing = mutator.days.places.list.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+            var place = existing ?? Place(name: name)
+            if let note = input["note"] as? String, !note.isEmpty { place.note = note }
+            mutator.days.places.upsert(place)
+            if let address = input["address"] as? String, !address.isEmpty {
+                let days = mutator.days
+                let id = mutator.days.places.list.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }?.id ?? place.id
+                Task { @MainActor in
+                    guard let (coord, label) = try? await TravelEstimator.geocode(address), var p = days.places.place(id: id) else { return }
+                    p.latitude = coord.latitude; p.longitude = coord.longitude; p.note = label
+                    days.places.upsert(p)
+                    await TravelEstimator.estimateAll(days)
+                }
+                return Result(output: "Saved \(name); pinning \"\(address)\" on Apple Maps and estimating travel to the other pinned places (check get_places in a moment)", summary: "Place: \(name)")
+            }
+            return Result(output: "Saved place \(name)" + (place.isPinned ? "" : " (not pinned; give me an address to estimate travel)"), summary: "Place: \(name)")
 
         case "set_travel":
             guard let from = input["from"] as? String, let to = input["to"] as? String, let minutes = Self.int(input["minutes"]),
