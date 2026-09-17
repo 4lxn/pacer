@@ -17,6 +17,18 @@ struct MealEntry: Codable, Identifiable, Hashable, Sendable {
     var name: String
     var kcal: Int
     var proteinGrams: Int
+    var carbsGrams: Int = 0
+    var fatGrams: Int = 0
+
+    init(id: String = UUID().uuidString, date: Date, name: String, kcal: Int, proteinGrams: Int, carbsGrams: Int = 0, fatGrams: Int = 0) {
+        self.id = id; self.date = date; self.name = name; self.kcal = kcal; self.proteinGrams = proteinGrams; self.carbsGrams = carbsGrams; self.fatGrams = fatGrams
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id); date = try c.decode(Date.self, forKey: .date); name = try c.decode(String.self, forKey: .name)
+        kcal = try c.decode(Int.self, forKey: .kcal); proteinGrams = try c.decode(Int.self, forKey: .proteinGrams)
+        carbsGrams = try c.decodeIfPresent(Int.self, forKey: .carbsGrams) ?? 0; fatGrams = try c.decodeIfPresent(Int.self, forKey: .fatGrams) ?? 0
+    }
 }
 
 /// A saved meal for one-tap logging.
@@ -25,16 +37,58 @@ struct MealPreset: Codable, Identifiable, Hashable, Sendable {
     var name: String
     var kcal: Int
     var proteinGrams: Int
+    var carbsGrams: Int = 0
+    var fatGrams: Int = 0
+
+    init(id: String = UUID().uuidString, name: String, kcal: Int, proteinGrams: Int, carbsGrams: Int = 0, fatGrams: Int = 0) {
+        self.id = id; self.name = name; self.kcal = kcal; self.proteinGrams = proteinGrams; self.carbsGrams = carbsGrams; self.fatGrams = fatGrams
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id); name = try c.decode(String.self, forKey: .name)
+        kcal = try c.decode(Int.self, forKey: .kcal); proteinGrams = try c.decode(Int.self, forKey: .proteinGrams)
+        carbsGrams = try c.decodeIfPresent(Int.self, forKey: .carbsGrams) ?? 0; fatGrams = try c.decodeIfPresent(Int.self, forKey: .fatGrams) ?? 0
+    }
 }
 
 struct MacroTargets: Codable, Hashable, Sendable {
     var kcal: Int
     var proteinGrams: Int
+    var carbsGrams: Int = 0   // 0 = not tracked
+    var fatGrams: Int = 0
+
+    init(kcal: Int, proteinGrams: Int, carbsGrams: Int = 0, fatGrams: Int = 0) {
+        self.kcal = kcal; self.proteinGrams = proteinGrams; self.carbsGrams = carbsGrams; self.fatGrams = fatGrams
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kcal = try c.decode(Int.self, forKey: .kcal); proteinGrams = try c.decode(Int.self, forKey: .proteinGrams)
+        carbsGrams = try c.decodeIfPresent(Int.self, forKey: .carbsGrams) ?? 0; fatGrams = try c.decodeIfPresent(Int.self, forKey: .fatGrams) ?? 0
+    }
 }
 
 struct DayMacros: Equatable {
     var kcal = 0
     var proteinGrams = 0
+    var carbsGrams = 0
+    var fatGrams = 0
+}
+
+/// Something you cook from the pantry. Cooking deducts the ingredients and logs the meal.
+struct Recipe: Codable, Identifiable, Hashable, Sendable {
+    struct Ingredient: Codable, Hashable, Sendable {
+        var name: String      // matched to a pantry item by name, case-insensitive
+        var amount: Double
+        var unit: String
+    }
+    var id: String = UUID().uuidString
+    var name: String
+    var ingredients: [Ingredient]
+    var kcal: Int
+    var proteinGrams: Int
+    var carbsGrams: Int = 0
+    var fatGrams: Int = 0
+    var note: String = ""
 }
 
 @Observable
@@ -45,11 +99,13 @@ final class FoodStore {
         var meals: [MealEntry]
         var presets: [MealPreset]
         var targets: MacroTargets
+        var recipes: [Recipe]?
     }
 
     private(set) var pantry: [PantryItem] = []
     private(set) var meals: [MealEntry] = []
     private(set) var presets: [MealPreset] = []
+    private(set) var recipes: [Recipe] = []
     var targets = MacroTargets(kcal: 2300, proteinGrams: 160) { didSet { save() } }
 
     private let fileURL: URL
@@ -63,7 +119,7 @@ final class FoodStore {
         self.fileURL = fileURL
         self.calendar = calendar
         if case .loaded(let s) = JSONFile.load(Snapshot.self, from: fileURL) {
-            pantry = s.pantry; meals = s.meals; presets = s.presets; targets = s.targets
+            pantry = s.pantry; meals = s.meals; presets = s.presets; targets = s.targets; recipes = s.recipes ?? []
         }
     }
 
@@ -74,20 +130,75 @@ final class FoodStore {
     }
 
     func macros(on date: Date) -> DayMacros {
-        meals(on: date).reduce(into: DayMacros()) { $0.kcal += $1.kcal; $0.proteinGrams += $1.proteinGrams }
+        meals(on: date).reduce(into: DayMacros()) {
+            $0.kcal += $1.kcal; $0.proteinGrams += $1.proteinGrams; $0.carbsGrams += $1.carbsGrams; $0.fatGrams += $1.fatGrams
+        }
+    }
+
+    /// kcal per day for the last `days` days, oldest first (today last).
+    func kcalByDay(days: Int, now: Date) -> [(date: Date, kcal: Int, protein: Int)] {
+        (0..<days).reversed().compactMap { offset in
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: now) else { return nil }
+            let m = macros(on: day)
+            return (calendar.startOfDay(for: day), m.kcal, m.proteinGrams)
+        }
     }
 
     func log(_ preset: MealPreset, at date: Date = .now) {
-        meals.append(MealEntry(date: date, name: preset.name, kcal: preset.kcal, proteinGrams: preset.proteinGrams))
+        meals.append(MealEntry(date: date, name: preset.name, kcal: preset.kcal, proteinGrams: preset.proteinGrams, carbsGrams: preset.carbsGrams, fatGrams: preset.fatGrams))
         save()
     }
 
-    func log(name: String, kcal: Int, proteinGrams: Int, at date: Date = .now, saveAsPreset: Bool) {
-        meals.append(MealEntry(date: date, name: name, kcal: kcal, proteinGrams: proteinGrams))
+    func log(name: String, kcal: Int, proteinGrams: Int, carbsGrams: Int = 0, fatGrams: Int = 0, at date: Date = .now, saveAsPreset: Bool) {
+        meals.append(MealEntry(date: date, name: name, kcal: kcal, proteinGrams: proteinGrams, carbsGrams: carbsGrams, fatGrams: fatGrams))
         if saveAsPreset, !presets.contains(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
-            presets.append(MealPreset(name: name, kcal: kcal, proteinGrams: proteinGrams))
+            presets.append(MealPreset(name: name, kcal: kcal, proteinGrams: proteinGrams, carbsGrams: carbsGrams, fatGrams: fatGrams))
         }
         save()
+    }
+
+    // MARK: - Recipes
+
+    func item(named name: String) -> PantryItem? {
+        pantry.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+    }
+
+    /// Ingredients the pantry can't cover right now.
+    func missing(for recipe: Recipe) -> [Recipe.Ingredient] {
+        recipe.ingredients.filter { ing in
+            guard let item = item(named: ing.name) else { return true }
+            return item.quantity < ing.amount
+        }
+    }
+
+    func canCook(_ recipe: Recipe) -> Bool { missing(for: recipe).isEmpty }
+
+    func upsertRecipe(_ recipe: Recipe) {
+        if let i = recipes.firstIndex(where: { $0.id == recipe.id || $0.name.caseInsensitiveCompare(recipe.name) == .orderedSame }) {
+            var r = recipe; r.id = recipes[i].id; recipes[i] = r
+        } else {
+            recipes.append(recipe)
+        }
+        save()
+    }
+
+    func deleteRecipe(id: String) {
+        recipes.removeAll { $0.id == id }
+        save()
+    }
+
+    /// Deducts the ingredients (never below zero) and logs the meal. Returns false if something is missing.
+    @discardableResult
+    func cook(_ recipe: Recipe, at date: Date = .now, force: Bool = false) -> Bool {
+        guard force || canCook(recipe) else { return false }
+        for ing in recipe.ingredients {
+            if let i = pantry.firstIndex(where: { $0.name.caseInsensitiveCompare(ing.name) == .orderedSame }) {
+                pantry[i].quantity = max(0, pantry[i].quantity - ing.amount)
+            }
+        }
+        meals.append(MealEntry(date: date, name: recipe.name, kcal: recipe.kcal, proteinGrams: recipe.proteinGrams, carbsGrams: recipe.carbsGrams, fatGrams: recipe.fatGrams))
+        save()
+        return true
     }
 
     func deleteMeal(id: String) {
@@ -129,6 +240,13 @@ final class FoodStore {
         save()
     }
 
+    /// Bought it: back to twice the minimum (or the minimum + what's there, whichever is more).
+    func restock(id: String) {
+        guard let i = pantry.firstIndex(where: { $0.id == id }) else { return }
+        pantry[i].quantity = max(pantry[i].minQuantity * 2, pantry[i].quantity + pantry[i].minQuantity)
+        save()
+    }
+
     /// Text for the Coach snapshot and the share sheet.
     func groceryText() -> String {
         groceryList.map { "- \($0.name): have \(Self.format($0.quantity)) \($0.unit), want \(Self.format($0.minQuantity))" }.joined(separator: "\n")
@@ -148,6 +266,9 @@ final class FoodStore {
         if !groceryList.isEmpty {
             lines.append("Running low: " + groceryList.map(\.name).joined(separator: ", "))
         }
+        if !recipes.isEmpty {
+            lines.append("Recipes: " + recipes.map { "\($0.name)\(canCook($0) ? "" : " (missing \(missing(for: $0).map(\.name).joined(separator: ", ")))")" }.joined(separator: "; "))
+        }
         return lines.joined(separator: "\n")
     }
 
@@ -158,7 +279,7 @@ final class FoodStore {
     // MARK: - Persistence
 
     private func save() {
-        JSONFile.save(Snapshot(pantry: pantry, meals: meals, presets: presets, targets: targets), to: fileURL)
+        JSONFile.save(Snapshot(pantry: pantry, meals: meals, presets: presets, targets: targets, recipes: recipes), to: fileURL)
     }
 
     // MARK: - Sample data (tests and previews)
