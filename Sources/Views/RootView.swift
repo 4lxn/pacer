@@ -28,7 +28,7 @@ struct RootView: View {
         TabView(selection: $selectedTab) {
             DayView(store: store, plan: plan, days: days, mutator: mutator, metrics: metrics, health: health, track: track, account: account)
                 .tabItem { Label("Today", systemImage: "sun.max") }.tag("today")
-            TrainView(health: health)
+            TrainView(health: health, mutator: mutator)
                 .tabItem { Label("Train", systemImage: "figure.run") }.tag("train")
             FoodView(food: food)
                 .tabItem { Label("Food", systemImage: "fork.knife") }.tag("food")
