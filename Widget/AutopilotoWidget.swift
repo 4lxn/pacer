@@ -7,6 +7,7 @@ struct AutopilotoWidgetBundle: WidgetBundle {
         NowNextWidget()
         DayListWidget()
         DayProgressWidget()
+        PacerLiveActivity()
     }
 }
 

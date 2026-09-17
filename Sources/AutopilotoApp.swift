@@ -50,6 +50,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             if let block = missed.last { mutator.replan(block.id, on: .now) }
         }
         #endif
+        NotificationScheduler.soundName = days.sound == "pacer" ? "pacer.caf" : nil
         let center = UNUserNotificationCenter.current()
         center.delegate = notificationDelegate
         NotificationScheduler.registerCategory(center: center)
@@ -64,6 +65,16 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             task.expirationHandler = { work.cancel(); task.setTaskCompleted(success: false) }
         }
         Self.scheduleRearm()
+
+        // "Done" tapped on the Live Activity (the intent runs in this process).
+        NotificationCenter.default.addObserver(forName: .pacerMarkDone, object: nil, queue: .main) { [weak self] note in
+            guard let self, let id = note.userInfo?["blockID"] as? String, let key = note.userInfo?["dayKey"] as? String else { return }
+            MainActor.assumeIsolated {
+                store.reload()
+                mutator.setDone(id, true, dayKey: key, source: .notification)
+                Task { await self.mutator.flush() }
+            }
+        }
 
         // A workout synced into Health closes its block even if the app never opens.
         health.startObserving { [weak self] in

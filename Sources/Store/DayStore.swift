@@ -12,12 +12,18 @@ final class DayStore {
     var dayEnd: DateComponents { didSet { saveSettings() } }
     /// Master switch for end-of-block check-ins (start notifications are unaffected).
     var checkInsEnabled = true { didSet { saveSettings() } }
+    /// Dynamic Island / Lock Screen Live Activity for the block that's on.
+    var liveActivity = true { didSet { saveSettings() } }
+    /// "pacer" (the bundled chime) or "system".
+    var sound = "pacer" { didSet { saveSettings() } }
     /// Places and travel times between them (`places.json`).
     var places = Places() { didSet { JSONFile.save(places, to: placesURL) } }
 
     private struct Settings: Codable {
         var dayEnd: DateComponents
         var checkInsEnabled: Bool?
+        var sound: String?
+        var liveActivity: Bool?
     }
 
     private let overridesURL: URL
@@ -38,12 +44,14 @@ final class DayStore {
         if case .loaded(let s) = JSONFile.load(Settings.self, from: settingsURL) {
             dayEnd = s.dayEnd
             checkInsEnabled = s.checkInsEnabled ?? true
+            sound = s.sound ?? "pacer"
+            liveActivity = s.liveActivity ?? true
         } else {
             dayEnd = fallbackDayEnd
         }
     }
 
-    private func saveSettings() { JSONFile.save(Settings(dayEnd: dayEnd, checkInsEnabled: checkInsEnabled), to: settingsURL) }
+    private func saveSettings() { JSONFile.save(Settings(dayEnd: dayEnd, checkInsEnabled: checkInsEnabled, sound: sound, liveActivity: liveActivity), to: settingsURL) }
 
     func override(dayKey: String) -> DayOverride { overrides[dayKey] ?? DayOverride() }
 

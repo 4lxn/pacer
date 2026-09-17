@@ -31,8 +31,10 @@ Deferred work with enough context to pick up cold. Effort is human-team → with
 
 ## P3
 
-- **Live Activity for the current block** — Dynamic Island countdown + Done. Needs APNs on the
-  proxy for reliable background starts (D5.6). Effort: M → S. Blocked by: widget target, APNs.
+- **Live Activity push updates** — the activity is started/updated only while the app runs
+  (foreground, notification actions, BG refresh, Health delivery), so when a block ends with the
+  app closed the island shows the stale block until the next hand-off. APNs push-to-start / update
+  from the proxy at each block boundary would make it exact. Effort: M → S.
 - **Watch app (Done from the wrist)** — WatchConnectivity or its own container; App Groups do
   not span iPhone ↔ Watch. Effort: L → M.
 - **iCloud sync** — NSUbiquitousKeyValueStore is too small; CloudKit records per store.
