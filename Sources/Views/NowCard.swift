@@ -25,7 +25,7 @@ struct NowCard: View {
                         Text("\(NotificationScheduler.clock(start)) – \(NotificationScheduler.clock(end))")
                         if status == .current, let endDate = block.endDate(on: now, calendar: calendar) {
                             let minutes = max(0, Int(endDate.timeIntervalSince(now) / 60))
-                            Text("· \(minutes) min left")
+                            Text("· \(minutes) min left").contentTransition(.numericText())
                         }
                     }
                     .font(.headline)
@@ -60,8 +60,10 @@ struct NowCard: View {
                     .labelStyle(.titleAndIcon)
                 }
             } else if allDone {
+                Image(systemName: "checkmark.seal.fill").font(.system(size: 40)).foregroundStyle(Color.accentColor)
+                    .symbolEffect(.bounce, options: .nonRepeating)
                 Text("All done for today").font(.largeTitle.weight(.bold))
-                Text("Nothing left on the plan.").foregroundStyle(.secondary)
+                Text("Nothing left on the plan. See you tomorrow.").foregroundStyle(.secondary)
             } else {
                 Text("Nothing right now").font(.largeTitle.weight(.bold))
                 Text("Next block is below.").foregroundStyle(.secondary)
@@ -69,6 +71,6 @@ struct NowCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
-        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
     }
 }

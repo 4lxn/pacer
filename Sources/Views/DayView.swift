@@ -29,32 +29,58 @@ struct DayView: View {
     private var counted: [Block] { blocks.filter { !skipped.contains($0.id) } }
     private var doneCount: Int { counted.filter { completed.contains($0.id) }.count }
 
+    private func status(_ block: Block) -> BlockStatus { block.status(now: now, completed: completed, skipped: skipped, calendar: calendar) }
+    /// Ahead of you: current, upcoming and anytime blocks. Missed ones need a decision, so they get their own section.
+    private var leftToday: [Block] { blocks.filter { [.current, .upcoming, .free].contains(status($0)) } }
+    private var missed: [Block] { blocks.filter { status($0) == .missed } }
+    private var finished: [Block] { blocks.filter { completed.contains($0.id) || skipped.contains($0.id) } }
+    private var current: Block? { DayLogic.currentBlock(blocks, now: now, completed: completed, skipped: skipped, calendar: calendar) }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                if let error = persistence.lastError { persistenceBanner(error) }
-                if notificationsDenied && !bannerDismissed { permissionBanner }
-                NowCard(
-                    block: DayLogic.currentBlock(blocks, now: now, completed: completed, skipped: skipped, calendar: calendar),
-                    allDone: doneCount == counted.count,
-                    now: now,
-                    completed: completed,
-                    calendar: calendar,
-                    onDone: { id in mutator.setDone(id, true, dayKey: mutator.dayKey(now)) },
-                    onSkip: { id in mutator.skipToday(id, dayKey: mutator.dayKey(now)) },
-                    onReplan: { id in mutator.replan(id, on: now) }
-                )
-                upNext
-                dayList
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    progress
+                    if let error = persistence.lastError { persistenceBanner(error) }
+                    if notificationsDenied && !bannerDismissed { permissionBanner }
+                    NowCard(
+                        block: current,
+                        allDone: doneCount == counted.count,
+                        now: now,
+                        completed: completed,
+                        calendar: calendar,
+                        onDone: { id in mutator.setDone(id, true, dayKey: mutator.dayKey(now)) },
+                        onSkip: { id in mutator.skipToday(id, dayKey: mutator.dayKey(now)) },
+                        onReplan: { id in mutator.replan(id, on: now) }
+                    )
+                    .id(current?.id ?? "none")
+                    .transition(.blurReplace)
+                    upNext
+                    section("Left today", count: leftToday.count, blocks: leftToday, empty: "Nothing left on the plan.")
+                    if !missed.isEmpty {
+                        section("Missed", count: missed.count, blocks: missed, empty: nil, hint: "Hold a row to move it later or skip it today.")
+                    }
+                    if !finished.isEmpty { section("Done", count: nil, blocks: finished, empty: nil) }
+                }
+                .padding()
+                .padding(.bottom, 72)   // room for the undo toast
+                .animation(.snappy(duration: 0.4), value: completed)
+                .animation(.snappy(duration: 0.4), value: skipped)
+                .animation(.snappy(duration: 0.4), value: moved)
             }
-            .padding()
-            .padding(.bottom, 72)   // room for the undo toast
+            .background(Color(uiColor: .systemGroupedBackground))
+            .navigationTitle("Today")
+            .navigationSubtitle(now.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button { editingPlan = true } label: { Label("Edit plan", systemImage: "slider.horizontal.3") }
+                    Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
+                }
+            }
         }
-        .background(Color(uiColor: .systemGroupedBackground))
         .overlay(alignment: .bottom) { undoToast }
         .animation(.snappy(duration: 0.35), value: mutator.lastChange)
-        .animation(.snappy(duration: 0.35), value: moved)
+        .sensoryFeedback(trigger: doneCount) { old, new in new > old ? .success : nil }
         .onReceive(tick) { now = $0 }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
@@ -86,31 +112,25 @@ struct DayView: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(now, format: .dateTime.weekday(.wide).day().month(.wide))
-                    .font(.title2.weight(.semibold))
+    /// "8 / 21 done" with a bar that fills as the day goes; visible progress is the point.
+    private var progress: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
                 Text("\(doneCount) / \(counted.count) done")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.medium))
                     .monospacedDigit()
-            }
-            Spacer()
-            GlassEffectContainer(spacing: 8) {
-                HStack(spacing: 8) {
-                    Button { editingPlan = true } label: {
-                        Image(systemName: "slider.horizontal.3").frame(width: 24, height: 24)
-                    }
-                    .accessibilityLabel("Edit plan")
-                    Button { showingSettings = true } label: {
-                        Image(systemName: "gearshape").frame(width: 24, height: 24)
-                    }
-                    .accessibilityLabel("Settings")
+                    .contentTransition(.numericText())
+                Spacer()
+                if counted.count > 0 {
+                    Text("\(Int((Double(doneCount) / Double(counted.count) * 100).rounded()))%")
+                        .font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
+                        .contentTransition(.numericText())
                 }
-                .buttonStyle(.glass)
             }
+            ProgressView(value: Double(doneCount), total: Double(max(counted.count, 1)))
+                .tint(.accentColor)
         }
+        .animation(.snappy, value: doneCount)
     }
 
     private func persistenceBanner(_ message: String) -> some View {
@@ -125,7 +145,7 @@ struct DayView: View {
                 .accessibilityLabel("Dismiss")
         }
         .padding()
-        .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
     }
 
     private var permissionBanner: some View {
@@ -152,7 +172,7 @@ struct DayView: View {
             .accessibilityLabel("Dismiss")
         }
         .padding()
-        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
     }
 
     @ViewBuilder
@@ -167,25 +187,46 @@ struct DayView: View {
         }
     }
 
-    private var dayList: some View {
+    private func section(_ title: String, count: Int?, blocks: [Block], empty: String?, hint: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("The day").font(.headline)
-            VStack(spacing: 0) {
-                ForEach(blocks) { block in
-                    BlockRow(
-                        block: block,
-                        status: block.status(now: now, completed: completed, skipped: skipped, calendar: calendar),
-                        subtitle: block.note(on: now, calendar: calendar),
-                        moved: moved.contains(block.id),
-                        onToggle: { mutator.toggleDone(block.id, on: now) },
-                        onSkip: { mutator.skipToday(block.id, dayKey: mutator.dayKey(now)) },
-                        onUnskip: { mutator.unskip(block.id, on: now) },
-                        onReplan: { mutator.replan(block.id, on: now) }
-                    )
-                    if block.id != blocks.last?.id { Divider().padding(.leading, 72) }
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(title).font(.headline)
+                if let count {
+                    Text("\(count)").font(.caption.weight(.semibold)).monospacedDigit()
+                        .padding(.horizontal, 7).padding(.vertical, 2)
+                        .background(title == "Missed" ? Color.red.opacity(0.12) : Color(uiColor: .tertiarySystemFill), in: Capsule())
+                        .foregroundStyle(title == "Missed" ? .red : .secondary)
+                        .contentTransition(.numericText())
+                }
+                if let hint {
+                    Spacer()
+                    Text(hint).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
                 }
             }
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 4)
+            if blocks.isEmpty, let empty {
+                Text(empty).font(.subheadline).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(16)
+                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(blocks) { block in
+                        BlockRow(
+                            block: block,
+                            status: block.status(now: now, completed: completed, skipped: skipped, calendar: calendar),
+                            subtitle: block.note(on: now, calendar: calendar),
+                            moved: moved.contains(block.id),
+                            onToggle: { mutator.toggleDone(block.id, on: now) },
+                            onSkip: { mutator.skipToday(block.id, dayKey: mutator.dayKey(now)) },
+                            onUnskip: { mutator.unskip(block.id, on: now) },
+                            onReplan: { mutator.replan(block.id, on: now) }
+                        )
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        if block.id != blocks.last?.id { Divider().padding(.leading, 72) }
+                    }
+                }
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+            }
         }
     }
 

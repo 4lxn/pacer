@@ -96,6 +96,9 @@ struct FoodView: View {
                     Label("Need groceries: \(low.count) item\(low.count == 1 ? "" : "s") — share list", systemImage: "cart")
                 }
             }
+            if food.pantry.isEmpty {
+                Text("Nothing in the pantry yet. Add items with + or ask the Coach: “add 1 kg of rice”.").foregroundStyle(.secondary)
+            }
             ForEach(food.pantry.sorted { $0.name < $1.name }) { item in
                 HStack {
                     Button { editingItem = item } label: {

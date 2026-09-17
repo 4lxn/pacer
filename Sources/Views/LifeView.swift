@@ -16,7 +16,7 @@ struct LifeView: View {
                     TrackContent(track: track)
                 }
             }
-            .navigationTitle(section == "closet" ? "Closet" : "Track")
+            .navigationTitle(section == "closet" ? "Closet" : "Life")
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Picker("Section", selection: $section) {
