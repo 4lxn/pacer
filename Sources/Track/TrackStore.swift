@@ -27,13 +27,18 @@ final class TrackStore {
         var weeklyStudyGoalMinutes: Int
         var runningSince: Date?
         var runningTopic: String
+        var runningUntil: Date?
+        var monthlyIncomeGoal: Decimal?
     }
 
     private(set) var sessions: [StudySession] = []
     private(set) var income: [IncomeEntry] = []
     var weeklyStudyGoalMinutes = 300 { didSet { save() } }
+    var monthlyIncomeGoal: Decimal = 0 { didSet { save() } }
     private(set) var runningSince: Date?
     private(set) var runningTopic = ""
+    /// Focus target for the running session (pomodoro); the timer keeps counting past it.
+    private(set) var runningUntil: Date?
 
     private let fileURL: URL
     private let calendar: Calendar
@@ -47,7 +52,8 @@ final class TrackStore {
         self.calendar = calendar
         if case .loaded(let s) = JSONFile.load(Snapshot.self, from: fileURL) {
             sessions = s.sessions; income = s.income; weeklyStudyGoalMinutes = s.weeklyStudyGoalMinutes
-            runningSince = s.runningSince; runningTopic = s.runningTopic
+            runningSince = s.runningSince; runningTopic = s.runningTopic; runningUntil = s.runningUntil
+            monthlyIncomeGoal = s.monthlyIncomeGoal ?? 0
         }
     }
 
@@ -55,10 +61,11 @@ final class TrackStore {
 
     var isStudying: Bool { runningSince != nil }
 
-    func startStudy(topic: String, at date: Date = .now) {
+    func startStudy(topic: String, at date: Date = .now, focusMinutes: Int? = nil) {
         guard runningSince == nil else { return }
         runningSince = date
         runningTopic = topic
+        runningUntil = focusMinutes.map { date.addingTimeInterval(Double($0) * 60) }
         save()
     }
 
@@ -67,6 +74,7 @@ final class TrackStore {
     func stopStudy(at date: Date = .now) -> StudySession? {
         guard let start = runningSince else { return nil }
         runningSince = nil
+        runningUntil = nil
         let topic = runningTopic
         runningTopic = ""
         guard date.timeIntervalSince(start) >= 60 else { save(); return nil }
@@ -100,6 +108,37 @@ final class TrackStore {
         Array(sessions.sorted { $0.start > $1.start }.prefix(limit))
     }
 
+    /// Minutes per day, oldest first, today last.
+    func studyMinutesByDay(days: Int, now: Date) -> [(date: Date, minutes: Int)] {
+        (0..<days).reversed().compactMap { offset in
+            calendar.date(byAdding: .day, value: -offset, to: now).map { (calendar.startOfDay(for: $0), studyMinutes(on: $0)) }
+        }
+    }
+
+    /// Minutes per topic this week, largest first.
+    func studyByTopic(weekOf date: Date) -> [(topic: String, minutes: Int)] {
+        guard let week = calendar.dateInterval(of: .weekOfYear, for: date) else { return [] }
+        var totals: [String: Int] = [:]
+        for s in sessions where week.contains(s.start) { totals[s.topic, default: 0] += s.minutes }
+        return totals.map { ($0.key, $0.value) }.sorted { $0.minutes > $1.minutes }
+    }
+
+    /// Consecutive days (ending today or yesterday) with at least `minimum` minutes.
+    func studyStreak(now: Date, minimum: Int = 20) -> Int {
+        var streak = 0
+        var day = now
+        if studyMinutes(on: now) < minimum {
+            guard let y = calendar.date(byAdding: .day, value: -1, to: now), studyMinutes(on: y) >= minimum else { return 0 }
+            day = y
+        }
+        while studyMinutes(on: day) >= minimum {
+            streak += 1
+            guard let previous = calendar.date(byAdding: .day, value: -1, to: day) else { break }
+            day = previous
+        }
+        return streak
+    }
+
     // MARK: - Income
 
     func addIncome(source: String, amount: Decimal, on date: Date = .now) {
@@ -128,6 +167,14 @@ final class TrackStore {
         return totals.map { ($0.key, $0.value) }.sorted { $0.amount > $1.amount }
     }
 
+    /// Monthly totals, oldest first, current month last.
+    func incomeByMonth(months: Int, now: Date) -> [(month: Date, amount: Decimal)] {
+        (0..<months).reversed().compactMap { offset in
+            guard let m = calendar.date(byAdding: .month, value: -offset, to: now), let start = calendar.dateInterval(of: .month, for: m)?.start else { return nil }
+            return (start, incomeTotal(monthOf: m))
+        }
+    }
+
     func incomeTotal(yearOf date: Date) -> Decimal {
         guard let year = calendar.dateInterval(of: .year, for: date) else { return 0 }
         return income.filter { year.contains($0.date) }.reduce(0) { $0 + $1.amount }
@@ -136,7 +183,10 @@ final class TrackStore {
     // MARK: - Coach
 
     func coachSummary(now: Date) -> String {
-        var lines = ["## Study: \(studyMinutes(on: now)) min today, \(studyMinutes(weekOf: now)) / \(weeklyStudyGoalMinutes) min this week"]
+        var lines = ["## Study: \(studyMinutes(on: now)) min today, \(studyMinutes(weekOf: now)) / \(weeklyStudyGoalMinutes) min this week, streak \(studyStreak(now: now)) days"]
+        let topics = studyByTopic(weekOf: now)
+        if !topics.isEmpty { lines.append("By topic: " + topics.map { "\($0.topic) \($0.minutes) min" }.joined(separator: ", ")) }
+        if monthlyIncomeGoal > 0 { lines.append("Income this month: \(incomeTotal(monthOf: now)) of goal \(monthlyIncomeGoal)") }
         if let since = runningSince {
             lines.append("A study session is running since \(since.formatted(date: .omitted, time: .shortened)) (\(runningTopic)).")
         }
@@ -146,6 +196,7 @@ final class TrackStore {
     // MARK: - Persistence
 
     private func save() {
-        JSONFile.save(Snapshot(sessions: sessions, income: income, weeklyStudyGoalMinutes: weeklyStudyGoalMinutes, runningSince: runningSince, runningTopic: runningTopic), to: fileURL)
+        JSONFile.save(Snapshot(sessions: sessions, income: income, weeklyStudyGoalMinutes: weeklyStudyGoalMinutes, runningSince: runningSince, runningTopic: runningTopic,
+                               runningUntil: runningUntil, monthlyIncomeGoal: monthlyIncomeGoal), to: fileURL)
     }
 }

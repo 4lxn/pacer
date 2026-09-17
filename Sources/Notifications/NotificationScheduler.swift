@@ -70,6 +70,24 @@ enum NotificationScheduler {
 
     static func clock(_ c: DateComponents) -> String { DayLogic.clock(c) }
 
+    static let focusIdentifier = "study-focus"
+
+    /// "Focus block over" at `end`; replaces any previous one.
+    @MainActor
+    static func scheduleFocusEnd(at end: Date, topic: String, center: NotificationCenterClient = .live) async {
+        center.removePending([focusIdentifier])
+        let content = UNMutableNotificationContent()
+        content.title = topic.isEmpty ? "Focus block over" : "\(topic): focus block over"
+        content.body = "Take five, then stop or keep going."
+        content.sound = .default
+        content.threadIdentifier = "autopiloto-study"
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, end.timeIntervalSinceNow), repeats: false)
+        try? await center.add(UNNotificationRequest(identifier: focusIdentifier, content: content, trigger: trigger))
+    }
+
+    @MainActor
+    static func cancelFocusEnd(center: NotificationCenterClient = .live) { center.removePending([focusIdentifier]) }
+
     // MARK: - Check-ins and moved blocks
 
     /// One-shot check-in per check-in block for each of the next `checkInDays` days, skipping blocks
