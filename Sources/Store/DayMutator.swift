@@ -10,7 +10,7 @@ import WidgetKit
 @Observable
 @MainActor
 final class DayMutator {
-    enum Source { case app, notification }
+    enum Source { case app, notification, health }
 
     struct Change: Equatable {
         var summary: String          // "Moved Study → 19:00"
@@ -20,6 +20,7 @@ final class DayMutator {
     let plan: PlanStore
     let completions: CompletionStore
     let days: DayStore
+    let metrics: MetricsStore
     var calendar: Calendar
     var now: () -> Date
     var center: NotificationCenterClient
@@ -29,11 +30,12 @@ final class DayMutator {
     @ObservationIgnored private var queue: Task<Void, Never>?
     private let log = Logger(subsystem: "com.alan.autopiloto", category: "replan")
 
-    init(plan: PlanStore, completions: CompletionStore, days: DayStore, calendar: Calendar = .current,
+    init(plan: PlanStore, completions: CompletionStore, days: DayStore, metrics: MetricsStore, calendar: Calendar = .current,
          now: @escaping () -> Date = { .now }, center: NotificationCenterClient = .live) {
         self.plan = plan
         self.completions = completions
         self.days = days
+        self.metrics = metrics
         self.calendar = calendar
         self.now = now
         self.center = center
@@ -56,12 +58,25 @@ final class DayMutator {
 
     // MARK: - Writes
 
-    func setDone(_ id: String, _ done: Bool, dayKey: String) {
+    func setDone(_ id: String, _ done: Bool, dayKey: String, source: Source = .app) {
         let isDone = completions.completed(dayKey: dayKey).contains(id)
         guard done != isDone else { return }
         if done { completions.markDone(id, dayKey: dayKey) } else { completions.toggle(id, on: date(dayKey) ?? now()) }
-        if done { NotificationScheduler.cancelCheckIn(id, dayKey: dayKey, center: center) }
+        if done {
+            NotificationScheduler.cancelCheckIn(id, dayKey: dayKey, center: center)
+            metrics.record(source == .app ? .doneApp : source == .notification ? .doneNotification : .doneHealth, on: now())
+        }
         enqueueRearm()
+    }
+
+    /// Marks blocks done from Apple Health workouts / study minutes. Returns the ids closed.
+    @discardableResult
+    func autoClose(workouts: [WorkoutSummary], studyMinutesToday: Int, on date: Date) -> [String] {
+        let key = dayKey(date)
+        let ids = DayLogic.autoCompletions(effectivePlan(on: date), workouts: workouts, studyMinutesToday: studyMinutesToday,
+                                           now: date, completed: completions.completed(dayKey: key), calendar: calendar)
+        for id in ids { setDone(id, true, dayKey: key, source: .health) }
+        return ids
     }
 
     func toggleDone(_ id: String, on date: Date) {
@@ -74,6 +89,7 @@ final class DayMutator {
         recordUndo(dayKey: dayKey, summary: "Skipped \(label) today")
         completions.skip(id, dayKey: dayKey)
         NotificationScheduler.cancelCheckIn(id, dayKey: dayKey, center: center)
+        metrics.record(source == .app ? .skipApp : .skipNotification, on: now())
         finish(Change(summary: "Skipped \(label) today", undoable: true), source: source, dayKey: dayKey)
     }
 
@@ -115,6 +131,7 @@ final class DayMutator {
         for id in record.previousSkipped.subtracting(currentSkipped) { completions.skip(id, dayKey: record.dayKey) }
         days.setUndo(nil)
         lastChange = nil
+        metrics.record(.undo, on: now())
         enqueueRearm()
         if source == .notification { enqueue { await self.post(title: "Undone", body: record.summary, category: nil, dayKey: nil) } }
         return true
@@ -130,8 +147,9 @@ final class DayMutator {
             plan: { [self] day in effectivePlan(on: day) }, now: now(),
             completed: { [self] in completions.completed(dayKey: $0) }, skipped: { [self] in completions.skipped(dayKey: $0) },
             movedIDs: { [self] key in Set(days.override(dayKey: key).moved.keys) },
-            calendar: calendar, center: center
+            checkIns: days.checkInsEnabled, calendar: calendar, center: center
         )
+        metrics.markRearm(now())
     }
 
     /// Waits for the queued notification work. Notification actions call this before returning so
@@ -186,12 +204,14 @@ final class DayMutator {
             recordUndo(dayKey: dayKey, summary: summary)
             days.setOverride(override, dayKey: dayKey)
             for id in out { completions.skip(id, dayKey: dayKey) }
+            metrics.record(source == .app ? .replanApp : .replanNotification, on: now())
             log.info("\(summary)")
             finish(Change(summary: summary, undoable: true), source: source, dayKey: dayKey)
         case .noRoom:
             recordUndo(dayKey: dayKey, summary: "Skipped \(block.label) today")
             completions.skip(block.id, dayKey: dayKey)
             NotificationScheduler.cancelCheckIn(block.id, dayKey: dayKey, center: center)
+            metrics.record(.replanNoRoom, on: now())
             log.info("No room for \(block.label)")
             finish(Change(summary: "No room for \(block.label) today — it's back tomorrow", undoable: true), source: source, dayKey: dayKey)
         case .rejected(let reason):

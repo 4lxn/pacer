@@ -55,7 +55,7 @@ final class CoachAgentTests: XCTestCase {
         for preset in FoodStore.seedPresets { food.addPreset(name: preset.name, kcal: preset.kcal, proteinGrams: preset.proteinGrams) }
         let completions = CompletionStore(fileURL: dir.appendingPathComponent("completions.json"), calendar: calendar)
         let now = { self.calendar.date(from: DateComponents(year: 2026, month: 9, day: 16, hour: 12))! }
-        let mutator = DayMutator(plan: plan, completions: completions, days: DayStore(directory: dir), calendar: calendar, now: now, center: .noop)
+        let mutator = DayMutator(plan: plan, completions: completions, days: DayStore(directory: dir), metrics: MetricsStore(fileURL: dir.appendingPathComponent("metrics.json"), calendar: calendar), calendar: calendar, now: now, center: .noop)
         return CoachTools(
             plan: plan,
             completions: completions,

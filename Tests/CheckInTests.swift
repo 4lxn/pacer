@@ -91,7 +91,7 @@ final class CheckInTests: XCTestCase {
         let plan = PlanStore(fileURL: dir.appendingPathComponent("plan.json"))
         plan.replace(with: Plan.blocks)
         let fake = FakeCenter(pending: ["checkin-b21-2026-09-16"])
-        let mutator = DayMutator(plan: plan, completions: store, days: DayStore(directory: dir), calendar: calendar,
+        let mutator = DayMutator(plan: plan, completions: store, days: DayStore(directory: dir), metrics: MetricsStore(fileURL: dir.appendingPathComponent("metrics.json"), calendar: calendar), calendar: calendar,
                                  now: { self.date(16, 12) }, center: fake.client)
         let delegate = NotificationDelegate(mutator: mutator, calendar: calendar)
 

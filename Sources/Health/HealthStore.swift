@@ -3,6 +3,13 @@ import HealthKit
 import Observation
 import OSLog
 
+/// HKObserverQueryCompletionHandler isn't Sendable; it is safe to call from any thread once.
+private final class Completion: @unchecked Sendable {
+    private let handler: HKObserverQueryCompletionHandler
+    init(_ handler: @escaping HKObserverQueryCompletionHandler) { self.handler = handler }
+    func call() { handler() }
+}
+
 struct WeightSample: Identifiable, Hashable, Sendable {
     let date: Date
     let kg: Double
@@ -23,6 +30,7 @@ final class HealthStore {
     let isAvailable = HKHealthStore.isHealthDataAvailable()
     private let store = HKHealthStore()
     private let log = Logger(subsystem: "com.alan.autopiloto", category: "health")
+    private var observer: HKObserverQuery?
 
     private var readTypes: Set<HKObjectType> {
         [HKObjectType.workoutType(), HKQuantityType(.bodyMass), HKQuantityType(.stepCount)]
@@ -36,6 +44,28 @@ final class HealthStore {
         } catch {
             lastError = error.localizedDescription
             log.error("HealthKit authorization failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Wakes the app when a workout lands in Health (Garmin sync, Watch) so the matching block
+    /// closes without opening the app. `onUpdate` runs on the main actor; the HealthKit completion
+    /// handler is always called, or iOS stops delivering.
+    func startObserving(onUpdate: @escaping @MainActor () async -> Void) {
+        guard isAvailable, observer == nil else { return }
+        let type = HKObjectType.workoutType()
+        let query = HKObserverQuery(sampleType: type, predicate: nil) { [log] _, completion, error in
+            if let error { log.error("Workout observer: \(error.localizedDescription)") }
+            // The handler isn't Sendable; hop to the main actor with it boxed.
+            let done = Completion(completion)
+            Task { @MainActor in
+                await onUpdate()
+                done.call()
+            }
+        }
+        observer = query
+        store.execute(query)
+        store.enableBackgroundDelivery(for: type, frequency: .immediate) { [log] ok, error in
+            if let error { log.error("Background delivery: \(error.localizedDescription)") } else if ok { log.info("Background delivery on") }
         }
     }
 
