@@ -58,3 +58,56 @@ final class FoodStoreTests: XCTestCase {
         XCTAssertTrue(store.coachSummary(now: date(16, 12)).contains("Running low: Eggs, Rice"))
     }
 }
+
+@MainActor
+final class FoodDepthTests: XCTestCase {
+    func testRecipesCookRestockAndLegacyDecode() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("food.json")
+        // A pre-macros file: no carbs/fat, no recipes.
+        try Data(#"{"pantry":[{"id":"r","name":"Rice","quantity":500,"unit":"g","minQuantity":700}],"meals":[],"presets":[{"id":"p","name":"Shake","kcal":450,"proteinGrams":40}],"targets":{"kcal":2300,"proteinGrams":160}}"#.utf8).write(to: url)
+        let food = FoodStore(fileURL: url)
+        XCTAssertEqual(food.presets.first?.carbsGrams, 0)
+        XCTAssertEqual(food.targets.fatGrams, 0)
+        XCTAssertTrue(food.recipes.isEmpty)
+
+        food.upsert(PantryItem(name: "Chicken breast", quantity: 800, unit: "g", minQuantity: 600))
+        let bowl = Recipe(name: "Chicken bowl", ingredients: [.init(name: "chicken breast", amount: 200, unit: "g"), .init(name: "rice", amount: 70, unit: "g")], kcal: 520, proteinGrams: 50, carbsGrams: 55, fatGrams: 9)
+        food.upsertRecipe(bowl)
+        XCTAssertTrue(food.canCook(bowl))
+        XCTAssertTrue(food.cook(bowl))
+        XCTAssertEqual(food.item(named: "Rice")?.quantity, 430)
+        XCTAssertEqual(food.item(named: "chicken BREAST")?.quantity, 600)
+        XCTAssertEqual(food.macros(on: .now).carbsGrams, 55)
+
+        let big = Recipe(name: "Big", ingredients: [.init(name: "rice", amount: 5000, unit: "g"), .init(name: "salmon", amount: 1, unit: "pcs")], kcal: 1, proteinGrams: 1)
+        XCTAssertEqual(food.missing(for: big).map(\.name), ["rice", "salmon"])
+        XCTAssertFalse(food.cook(big))
+        XCTAssertTrue(food.cook(big, force: true))
+        XCTAssertEqual(food.item(named: "Rice")?.quantity, 0)
+
+        // Groceries: rice is low; "bought" restocks to 2× min.
+        XCTAssertTrue(food.groceryList.contains { $0.name == "Rice" })
+        food.restock(id: "r")
+        XCTAssertEqual(food.item(named: "Rice")?.quantity, 1400)
+        XCTAssertFalse(food.groceryList.contains { $0.name == "Rice" })
+
+        XCTAssertEqual(food.kcalByDay(days: 7, now: .now).count, 7)
+        XCTAssertEqual(food.kcalByDay(days: 7, now: .now).last?.kcal, 521)
+
+        // Round trip keeps recipes and macros.
+        let again = FoodStore(fileURL: url)
+        XCTAssertEqual(again.recipes.count, 1)
+        XCTAssertEqual(again.meals.last?.carbsGrams, 0)
+    }
+
+    func testMealGuessParsesInsideProse() {
+        let g = MealGuess.parse("Sure! {\"name\":\"Eggs on toast\",\"kcal\":420,\"proteinGrams\":22,\"carbsGrams\":30,\"fatGrams\":24,\"note\":\"2 eggs, 1 slice, butter\"} hope that helps")
+        XCTAssertEqual(g?.name, "Eggs on toast")
+        XCTAssertEqual(g?.kcal, 420)
+        XCTAssertEqual(g?.fatGrams, 24)
+        XCTAssertNil(MealGuess.parse("no json here"))
+        XCTAssertEqual(MealGuess.parse("{\"name\":\"\",\"kcal\":-5,\"proteinGrams\":1}")?.name, "Meal")
+    }
+}

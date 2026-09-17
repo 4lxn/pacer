@@ -65,12 +65,23 @@ struct CoachTools {
         tool("delete_pantry_item", "Remove an item from the pantry entirely.", ["name": str("Item name")], required: ["name"]),
         tool("get_grocery_list", "Items below their minimum, with how much to buy.", [:]),
         tool("get_meals_today", "Meals logged today with ids, plus totals vs targets, and the quick-log presets.", [:]),
-        tool("log_meal", "Log a meal eaten today with calories and protein.", [
+        tool("log_meal", "Log a meal eaten today. Estimate calories and macros from the description when the user doesn't give them (say what you assumed).", [
             "name": str("Meal name"), "kcal": ["type": "integer"], "protein_grams": ["type": "integer"],
+            "carbs_grams": ["type": "integer"], "fat_grams": ["type": "integer"],
         ], required: ["name", "kcal", "protein_grams"]),
+        tool("get_recipes", "Saved recipes with ingredients, macros and whether the pantry can cook them now.", [:]),
+        tool("add_recipe", "Save or update a recipe: ingredients matched to pantry items by name.", [
+            "name": str("Recipe name"), "kcal": ["type": "integer"], "protein_grams": ["type": "integer"],
+            "carbs_grams": ["type": "integer"], "fat_grams": ["type": "integer"], "note": str("How to make it, one line"),
+            "ingredients": ["type": "array", "items": ["type": "object", "properties": ["name": str("Pantry item name"), "amount": num(""), "unit": str("")], "required": ["name", "amount", "unit"]]],
+        ], required: ["name", "kcal", "protein_grams", "ingredients"]),
+        tool("cook_recipe", "Cook a recipe now: deducts its ingredients from the pantry and logs the meal. Fails if something is missing unless force=true.", [
+            "name": str("Recipe name"), "force": ["type": "boolean"],
+        ], required: ["name"]),
+        tool("delete_recipe", "Delete a recipe by name.", ["name": str("")], required: ["name"]),
         tool("delete_meal", "Delete a logged meal by id (from get_meals_today).", ["id": str("Meal id")], required: ["id"]),
-        tool("set_targets", "Set the daily calorie and/or protein targets.", [
-            "kcal": ["type": "integer"], "protein_grams": ["type": "integer"],
+        tool("set_targets", "Set the daily calorie / protein / carbs / fat targets (carbs and fat 0 = not tracked).", [
+            "kcal": ["type": "integer"], "protein_grams": ["type": "integer"], "carbs_grams": ["type": "integer"], "fat_grams": ["type": "integer"],
         ]),
         tool("add_preset", "Add or update a quick-log meal preset.", [
             "name": str(""), "kcal": ["type": "integer"], "protein_grams": ["type": "integer"],
@@ -262,10 +273,43 @@ struct CoachTools {
             guard let name = input["name"] as? String, let kcal = Self.int(input["kcal"]), let protein = Self.int(input["protein_grams"]) else {
                 return Result(output: "name, kcal and protein_grams are required", isError: true)
             }
-            food.log(name: name, kcal: kcal, proteinGrams: protein, at: today, saveAsPreset: false)
+            food.log(name: name, kcal: kcal, proteinGrams: protein, carbsGrams: Self.int(input["carbs_grams"]) ?? 0, fatGrams: Self.int(input["fat_grams"]) ?? 0, at: today, saveAsPreset: false)
             let m = food.macros(on: today)
             return Result(output: "Logged. Today: \(m.kcal)/\(food.targets.kcal) kcal, \(m.proteinGrams)/\(food.targets.proteinGrams) g protein",
                           summary: "Logged \(name) (\(kcal) kcal, \(protein) g)")
+
+        case "get_recipes":
+            guard !food.recipes.isEmpty else { return Result(output: "No recipes saved.") }
+            let lines = food.recipes.map { r -> String in
+                let missing = food.missing(for: r)
+                let ings = r.ingredients.map { "\($0.name) \(FoodStore.format($0.amount)) \($0.unit)" }.joined(separator: ", ")
+                return "\(r.name): \(r.kcal) kcal, \(r.proteinGrams) g P | \(ings) | " + (missing.isEmpty ? "can cook now" : "missing: \(missing.map(\.name).joined(separator: ", "))")
+            }
+            return Result(output: lines.joined(separator: "\n"))
+
+        case "add_recipe":
+            guard let name = input["name"] as? String, let kcal = Self.int(input["kcal"]), let protein = Self.int(input["protein_grams"]),
+                  let raw = input["ingredients"] as? [[String: Any]] else { return Result(output: "name, kcal, protein_grams and ingredients are required", isError: true) }
+            let ingredients = raw.compactMap { d -> Recipe.Ingredient? in
+                guard let n = d["name"] as? String, let a = Self.double(d["amount"]) else { return nil }
+                return Recipe.Ingredient(name: n, amount: a, unit: d["unit"] as? String ?? "pcs")
+            }
+            food.upsertRecipe(Recipe(name: name, ingredients: ingredients, kcal: kcal, proteinGrams: protein,
+                                     carbsGrams: Self.int(input["carbs_grams"]) ?? 0, fatGrams: Self.int(input["fat_grams"]) ?? 0, note: input["note"] as? String ?? ""))
+            return Result(output: "Saved recipe \(name)", summary: "Recipe: \(name)")
+
+        case "cook_recipe":
+            guard let name = input["name"] as? String, let recipe = food.recipes.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else { return Result(output: "No recipe with that name", isError: true) }
+            let missing = food.missing(for: recipe)
+            guard food.cook(recipe, at: today, force: input["force"] as? Bool ?? false) else {
+                return Result(output: "Missing: \(missing.map(\.name).joined(separator: ", ")). Pass force=true to cook anyway.", isError: true)
+            }
+            return Result(output: "Cooked \(recipe.name); pantry updated and meal logged", summary: "Cooked \(recipe.name)")
+
+        case "delete_recipe":
+            guard let name = input["name"] as? String, let recipe = food.recipes.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else { return Result(output: "No recipe with that name", isError: true) }
+            food.deleteRecipe(id: recipe.id)
+            return Result(output: "Deleted recipe \(recipe.name)", summary: "Removed recipe \(recipe.name)")
 
         case "get_grocery_list":
             let list = food.groceryList
@@ -322,6 +366,8 @@ struct CoachTools {
 
         case "set_targets":
             var t = food.targets
+            if let c = Self.int(input["carbs_grams"]) { t.carbsGrams = c }
+            if let f = Self.int(input["fat_grams"]) { t.fatGrams = f }
             if let k = Self.int(input["kcal"]) { t.kcal = k }
             if let p = Self.int(input["protein_grams"]) { t.proteinGrams = p }
             food.targets = t

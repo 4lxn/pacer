@@ -30,7 +30,7 @@ struct RootView: View {
                 .tabItem { Label("Today", systemImage: "sun.max") }.tag("today")
             TrainView(health: health, mutator: mutator)
                 .tabItem { Label("Train", systemImage: "figure.run") }.tag("train")
-            FoodView(food: food)
+            FoodView(food: food, account: account)
                 .tabItem { Label("Food", systemImage: "fork.knife") }.tag("food")
             LifeView(track: track, wardrobe: wardrobe, account: account)
                 .tabItem { Label("Life", systemImage: "sparkles") }.tag("life")
