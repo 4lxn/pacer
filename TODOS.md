@@ -18,8 +18,6 @@ Deferred work with enough context to pick up cold. Effort is human-team → with
 - **Morning brief notification** — BGAppRefresh + `CoachAgent`, one call per day at the anchor
   block: today's blocks, run, macros, weight trend, yesterday's misses. Deferred to validate
   replanning first and avoid API spend before users (D5.2). Effort: S → S.
-- **Lock Screen widget family** — `accessoryRectangular` on the same `DayTimeline` provider as
-  the Home widget (D5.4 / 1E). Effort: S → S. Widget target exists (PR3).
 - **Coach chat: keyboard dismiss + scroll polish** — the input bar is glass; check the transcript
   keeps its place when the keyboard opens on device. Effort: S → S.
 - **Repeating start notifications for moved blocks fire at the template time** — a block moved

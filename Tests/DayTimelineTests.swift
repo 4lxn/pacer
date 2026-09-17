@@ -53,3 +53,19 @@ final class DayTimelineTests: XCTestCase {
         XCTAssertEqual(snaps[2].date, date(16, 20, 1))
     }
 }
+
+final class DayTimelineUpcomingTests: XCTestCase {
+    func testSnapshotListsUpcomingAfterTheCurrentBlock() {
+        var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "America/Mexico_City")!
+        let now = c.date(from: DateComponents(year: 2026, month: 9, day: 16, hour: 12))!
+        let blocks = [
+            Block(id: "a", label: "Wake", kind: .fixed, start: .hm(7, 0), end: .hm(7, 10), isAnchor: true),
+            Block(id: "b", label: "Lunch", kind: .window, start: .hm(11, 45), end: .hm(12, 30)),
+            Block(id: "c", label: "Study", kind: .window, start: .hm(16, 0), end: .hm(17, 0)),
+            Block(id: "d", label: "Gym", kind: .window, start: .hm(19, 0), end: .hm(20, 0)),
+        ]
+        let snap = DayTimeline.snapshot(at: now, blocks: blocks, completed: ["a"], skipped: [], hasPlan: true, calendar: c)
+        XCTAssertEqual(snap.state, .now(blocks[1], missed: false))
+        XCTAssertEqual(snap.upcoming.map(\.id), ["c", "d"])
+    }
+}

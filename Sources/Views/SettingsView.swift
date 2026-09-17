@@ -60,9 +60,11 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Label("Now / Next on your Home Screen", systemImage: "square.grid.2x2")
-                } footer: {
-                    Text("Touch and hold the Home Screen → Edit → Add Widget → Pacer. It shows what's on now, what's next and your progress.")
+                    Label("Now / Next — Home Screen, small · medium · large", systemImage: "square.grid.2x2")
+                    Label("Now / Next — Lock Screen, rectangular · inline", systemImage: "lock.rectangle")
+                    Label("Day progress — Lock Screen circular · Home Screen small", systemImage: "circle.dotted.circle")
+                } header: { Text("Widgets") } footer: {
+                    Text("Home Screen: touch and hold → Edit → Add Widget → Pacer. Lock Screen: touch and hold the Lock Screen → Customize → tap the widget area → Pacer.")
                 }
 
                 Section("About") {

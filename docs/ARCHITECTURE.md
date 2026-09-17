@@ -80,7 +80,7 @@ limit) or directly with the user's own key.
 ## Targets
 
 - `Autopiloto` — the app (display name Pacer, bundle `com.alan.autopiloto`).
-- `AutopilotoWidget` — Now/Next, systemSmall; shares `Models/` + `Store/{AppFiles,JSONFile,PlanStore,CompletionStore,DayStore}`.
+- `AutopilotoWidget` — Now/Next (small · medium · large · Lock Screen rectangular · inline) and Day progress (Lock Screen circular · small), one `DayTimeline` provider; shares `Models/` + `Store/{AppFiles,JSONFile,PlanStore,CompletionStore,DayStore}`.
 - `AutopilotoTests` — pure logic first: Replanner, DayTimeline, DayMutator, scheduler, delegate, tools.
 
 `project.yml` (XcodeGen) is the source of truth for targets, entitlements and Info.plist keys.
