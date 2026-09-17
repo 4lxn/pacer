@@ -10,7 +10,13 @@ enum NotificationScheduler {
     // Check-ins (one-shot, 5 min after a block ends, today + tomorrow)
     static let checkInCategoryID = "CHECK_IN"
     static let skipTodayActionID = "SKIP_TODAY"
+    static let replanActionID = "REPLAN"
     static let checkInPrefix = "checkin-"
+    // Moved blocks (one-shot start notification for a replanned block)
+    static let movedPrefix = "moved-"
+    // Result of a replan done from a notification action; UNDO reverts it
+    static let undoCategoryID = "REPLAN_UNDO"
+    static let undoActionID = "UNDO"
     static let checkInDelayMinutes = 5
     static let checkInDays = 2
 
@@ -64,60 +70,73 @@ enum NotificationScheduler {
 
     static func clock(_ c: DateComponents) -> String { DayLogic.clock(c) }
 
-    // MARK: - Check-ins
+    // MARK: - Check-ins and moved blocks
 
     /// One-shot check-in per check-in block for each of the next `checkInDays` days, skipping blocks
-    /// already done or skipped that day and fire dates in the past. Sorted soonest first. Pure.
+    /// already done or skipped that day and fire dates in the past, plus one start notification per
+    /// moved block (its repeating start fires at the template time, so the new time needs its own).
+    /// `plan(day)` is the effective plan for that day. Sorted soonest first. Pure.
     static func buildCheckIns(
-        for blocks: [Block],
+        plan: (Date) -> [Block],
         now: Date,
         completed: (String) -> Set<String>,
         skipped: (String) -> Set<String>,
+        movedIDs: (String) -> Set<String> = { _ in [] },
         calendar: Calendar = .current
     ) -> [UNNotificationRequest] {
         var requests: [(Date, UNNotificationRequest)] = []
         for offset in 0..<checkInDays {
             guard let day = calendar.date(byAdding: .day, value: offset, to: now) else { continue }
             let dayKey = DayLogic.dayKey(day, calendar: calendar)
-            let done = completed(dayKey), skip = skipped(dayKey)
-            for block in blocks where block.checkIn && block.occurs(on: day, calendar: calendar) {
-                guard !done.contains(block.id), !skip.contains(block.id),
-                      let end = block.endDate(on: day, calendar: calendar),
-                      let fire = calendar.date(byAdding: .minute, value: checkInDelayMinutes, to: end),
-                      fire > now else { continue }
-                let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fire)
-                let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-                let content = UNMutableNotificationContent()
-                content.title = "\(block.label) ended"
-                content.body = "Did it happen?"
-                content.sound = .default
-                content.categoryIdentifier = checkInCategoryID
-                content.userInfo = [blockIDKey: block.id, dayKeyKey: dayKey]
-                content.threadIdentifier = "autopiloto-checkin"
-                requests.append((fire, UNNotificationRequest(identifier: checkInIdentifier(block.id, dayKey: dayKey), content: content, trigger: trigger)))
+            let done = completed(dayKey), skip = skipped(dayKey), moved = movedIDs(dayKey)
+            for block in plan(day) where block.occurs(on: day, calendar: calendar) {
+                guard !done.contains(block.id), !skip.contains(block.id) else { continue }
+                if block.checkIn, let end = block.endDate(on: day, calendar: calendar),
+                   let fire = calendar.date(byAdding: .minute, value: checkInDelayMinutes, to: end), fire > now {
+                    let content = UNMutableNotificationContent()
+                    content.title = "\(block.label) ended"
+                    content.body = "Did it happen?"
+                    content.sound = .default
+                    content.categoryIdentifier = checkInCategoryID
+                    content.userInfo = [blockIDKey: block.id, dayKeyKey: dayKey]
+                    content.threadIdentifier = "autopiloto-checkin"
+                    requests.append((fire, UNNotificationRequest(identifier: checkInIdentifier(block.id, dayKey: dayKey), content: content, trigger: trigger(fire, calendar))))
+                }
+                if moved.contains(block.id), let fire = block.startDate(on: day, calendar: calendar), fire > now {
+                    let content = content(for: block)
+                    content.userInfo = [blockIDKey: block.id, dayKeyKey: dayKey]
+                    requests.append((fire, UNNotificationRequest(identifier: movedIdentifier(block.id, dayKey: dayKey), content: content, trigger: trigger(fire, calendar))))
+                }
             }
         }
         return requests.sorted { $0.0 < $1.0 }.map(\.1)
     }
 
-    static func checkInIdentifier(_ blockID: String, dayKey: String) -> String { "\(checkInPrefix)\(blockID)-\(dayKey)" }
+    private static func trigger(_ fire: Date, _ calendar: Calendar) -> UNCalendarNotificationTrigger {
+        UNCalendarNotificationTrigger(dateMatching: calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fire), repeats: false)
+    }
 
-    /// Replaces only the `checkin-*` requests (start notifications and snoozes are untouched).
-    /// Keeps the total under `maxPending`: soonest check-ins win, the rest are logged.
+    static func checkInIdentifier(_ blockID: String, dayKey: String) -> String { "\(checkInPrefix)\(blockID)-\(dayKey)" }
+    static func movedIdentifier(_ blockID: String, dayKey: String) -> String { "\(movedPrefix)\(blockID)-\(dayKey)" }
+    static func isOneShot(_ identifier: String) -> Bool { identifier.hasPrefix(checkInPrefix) || identifier.hasPrefix(movedPrefix) }
+
+    /// Replaces only the `checkin-*` / `moved-*` requests (start notifications and snoozes are
+    /// untouched). Keeps the total under `maxPending`: soonest win, the rest are logged.
     @MainActor
     static func rearmCheckIns(
-        for blocks: [Block],
+        plan: (Date) -> [Block],
         now: Date = .now,
         completed: (String) -> Set<String>,
         skipped: (String) -> Set<String>,
+        movedIDs: (String) -> Set<String> = { _ in [] },
         calendar: Calendar = .current,
         center: NotificationCenterClient = .live
     ) async -> Int {
         let pending = await center.pendingIdentifiers()
-        let stale = pending.filter { $0.hasPrefix(checkInPrefix) }
+        let stale = pending.filter(isOneShot)
         center.removePending(stale)
         let room = max(0, maxPending - (pending.count - stale.count))
-        let wanted = buildCheckIns(for: blocks, now: now, completed: completed, skipped: skipped, calendar: calendar)
+        let wanted = buildCheckIns(plan: plan, now: now, completed: completed, skipped: skipped, movedIDs: movedIDs, calendar: calendar)
         if wanted.count > room {
             log.warning("\(wanted.count) check-ins wanted, room for \(room); dropping the latest ones")
         }
@@ -129,6 +148,19 @@ enum NotificationScheduler {
         }
         log.info("Re-armed \(added) check-ins")
         return added
+    }
+
+    /// Convenience for a fixed plan (no overrides).
+    @MainActor
+    static func rearmCheckIns(
+        for blocks: [Block],
+        now: Date = .now,
+        completed: (String) -> Set<String>,
+        skipped: (String) -> Set<String>,
+        calendar: Calendar = .current,
+        center: NotificationCenterClient = .live
+    ) async -> Int {
+        await rearmCheckIns(plan: { _ in blocks }, now: now, completed: completed, skipped: skipped, calendar: calendar, center: center)
     }
 
     /// Cancels one day's check-in for a block (after Done / Skip).
@@ -143,9 +175,12 @@ enum NotificationScheduler {
         let done = UNNotificationAction(identifier: markDoneActionID, title: "Done", options: [])
         let snooze = UNNotificationAction(identifier: snoozeActionID, title: "Snooze 10 min", options: [])
         let skip = UNNotificationAction(identifier: skipTodayActionID, title: "Skip today", options: [])
+        let replan = UNNotificationAction(identifier: replanActionID, title: "Move it later", options: [])
+        let undo = UNNotificationAction(identifier: undoActionID, title: "Undo", options: [])
         center.setNotificationCategories([
             UNNotificationCategory(identifier: categoryID, actions: [done, snooze], intentIdentifiers: [], options: []),
-            UNNotificationCategory(identifier: checkInCategoryID, actions: [done, skip], intentIdentifiers: [], options: []),
+            UNNotificationCategory(identifier: checkInCategoryID, actions: [done, replan, skip], intentIdentifiers: [], options: []),
+            UNNotificationCategory(identifier: undoCategoryID, actions: [undo], intentIdentifiers: [], options: []),
         ])
     }
 
@@ -158,7 +193,7 @@ enum NotificationScheduler {
             log.warning("Plan needs \(requests.count) start notifications; iOS allows \(Self.maxPending)")
         }
         let pending = await center.pendingIdentifiers()
-        center.removePending(pending.filter { !$0.hasPrefix(checkInPrefix) && !$0.hasSuffix("-snooze") })
+        center.removePending(pending.filter { !isOneShot($0) && !$0.hasSuffix("-snooze") })
         for request in requests {
             do { try await center.add(request) } catch {
                 log.error("Could not schedule \(request.identifier): \(error.localizedDescription)")

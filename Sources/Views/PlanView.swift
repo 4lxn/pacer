@@ -2,12 +2,25 @@ import SwiftUI
 
 struct PlanView: View {
     @Bindable var plan: PlanStore
+    @Bindable var days: DayStore
     @State private var editing: Block?
     @State private var adding = false
+
+    private var dayEnd: Binding<Date> {
+        Binding(
+            get: { Calendar.current.date(from: days.dayEnd) ?? .now },
+            set: { days.dayEnd = Calendar.current.dateComponents([.hour, .minute], from: $0) }
+        )
+    }
 
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    DatePicker("Day ends at", selection: dayEnd, displayedComponents: .hourAndMinute)
+                } footer: {
+                    Text("When a missed block is moved later, nothing is placed after this time.")
+                }
                 ForEach(DayLogic.sorted(plan.blocks)) { block in
                     Button { editing = block } label: { row(block) }
                         .foregroundStyle(.primary)

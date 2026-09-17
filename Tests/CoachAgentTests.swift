@@ -53,15 +53,19 @@ final class CoachAgentTests: XCTestCase {
         let food = FoodStore(fileURL: dir.appendingPathComponent("food.json"), calendar: calendar)
         for item in FoodStore.seedPantry { food.upsert(item) }
         for preset in FoodStore.seedPresets { food.addPreset(name: preset.name, kcal: preset.kcal, proteinGrams: preset.proteinGrams) }
+        let completions = CompletionStore(fileURL: dir.appendingPathComponent("completions.json"), calendar: calendar)
+        let now = { self.calendar.date(from: DateComponents(year: 2026, month: 9, day: 16, hour: 12))! }
+        let mutator = DayMutator(plan: plan, completions: completions, days: DayStore(directory: dir), calendar: calendar, now: now, center: .noop)
         return CoachTools(
             plan: plan,
-            completions: CompletionStore(fileURL: dir.appendingPathComponent("completions.json"), calendar: calendar),
+            completions: completions,
             food: food,
             wardrobe: WardrobeStore(fileURL: dir.appendingPathComponent("wardrobe.json")),
             health: HealthStore(),
             track: TrackStore(fileURL: dir.appendingPathComponent("track.json"), calendar: calendar),
+            mutator: mutator,
             calendar: calendar,
-            now: { self.calendar.date(from: DateComponents(year: 2026, month: 9, day: 16, hour: 12))! }
+            now: now
         )
     }
 

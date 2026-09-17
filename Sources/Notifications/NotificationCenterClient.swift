@@ -16,4 +16,7 @@ struct NotificationCenterClient {
         removePending: { UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: $0) },
         removeAllPending: { UNUserNotificationCenter.current().removeAllPendingNotificationRequests() }
     )
+
+    /// Discards everything; for tests and previews.
+    static let noop = NotificationCenterClient(add: { _ in }, pendingIdentifiers: { [] }, removePending: { _ in }, removeAllPending: {})
 }
