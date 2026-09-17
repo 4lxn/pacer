@@ -18,6 +18,7 @@ struct CoachView: View {
     @State private var editingProfile = false
     @State private var draft = ""
     @State private var confirmClear = false
+    @State private var showingHistory = false
     @FocusState private var inputFocused: Bool
     @Namespace private var glass
 
@@ -25,6 +26,9 @@ struct CoachView: View {
     private let suggestions = ["What's next?", "What should I have for dinner?", "What do I need to buy?", "Add 1 kg of rice", "Move study to 5 pm", "What should I wear?"]
 
     private var canAsk: Bool {
+        #if DEBUG
+        if CoachAccount.screenshotMode == "chat" { return true }
+        #endif
         if useOwnKey { return !apiKey.isEmpty }
         return account.isSignedIn && account.isSubscribed
     }
@@ -41,11 +45,45 @@ struct CoachView: View {
                 }
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Coach")
+            .navigationTitle(canAsk && !agent.chat.entries.isEmpty ? agent.chat.current.title : "Coach")
+            .navigationBarTitleDisplayMode(canAsk && !agent.chat.entries.isEmpty ? .inline : .large)
             .toolbar {
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    if canAsk {
+                        Button { showingHistory = true } label: { Label("History", systemImage: "clock.arrow.circlepath") }
+                        Button { agent.chat.newConversation() } label: { Label("New chat", systemImage: "square.and.pencil") }
+                            .disabled(agent.isBusy || agent.chat.entries.isEmpty)
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) { menu }
+            }
+            .sheet(isPresented: $editingProfile) { ProfileEditor() }
+            .sheet(isPresented: $editingKey) { keySheet }
+            .confirmationDialog("Delete this conversation?", isPresented: $confirmClear, titleVisibility: .visible) {
+                Button("Delete chat", role: .destructive) { agent.chat.delete(agent.chat.current.id) }
+            } message: {
+                Text("The coach forgets this chat. Your profile and Memory stay.")
+            }
+            .sheet(isPresented: $showingHistory) { ChatHistorySheet(chat: agent.chat) }
+            .task { if CoachClient.proxyURL != nil { await account.loadProduct() } }
+            .onAppear {
+                #if DEBUG
+                if CoachAccount.screenshotMode == "chat", agent.chat.entries.isEmpty {
+                    agent.chat.appendUser(text: "What's left today?")
+                    agent.chat.appendAssistant(content: [["type": "text", "text": "**Three blocks left:**\n\n1. Gym (Upper) until 20:15\n2. Dinner at 20:30\n3. Evening routine at 21:45\n\nWant me to move anything?"]])
+                    agent.chat.appendUser(text: "Move dinner to 21:00")
+                    agent.chat.appendAssistant(content: [["type": "text", "text": "Done — Dinner is at 21:00 today only; Evening routine stays at 21:45."]])
+                    showingHistory = true
+                }
+                #endif
+            }
+        }
+    }
+
+    private var menu: some View {
                 Menu {
                     Button("Coach profile", systemImage: "person.text.rectangle") { editingProfile = true }
-                    Button("Clear chat", systemImage: "trash", role: .destructive) { confirmClear = true }
+                    Button("Delete this chat", systemImage: "trash", role: .destructive) { confirmClear = true }
                     if CoachClient.proxyURL != nil {
                         Toggle("Use my own API key", isOn: $useOwnKey)
                     }
@@ -59,16 +97,6 @@ struct CoachView: View {
                         Button("Restore purchases") { Task { await account.restore() } }
                     }
                 } label: { Image(systemName: "ellipsis.circle") }
-            }
-            .sheet(isPresented: $editingProfile) { ProfileEditor() }
-            .sheet(isPresented: $editingKey) { keySheet }
-            .confirmationDialog("Clear the conversation?", isPresented: $confirmClear, titleVisibility: .visible) {
-                Button("Clear chat", role: .destructive) { agent.chat.clear() }
-            } message: {
-                Text("The coach forgets this chat. Your profile and Memory stay.")
-            }
-            .task { if CoachClient.proxyURL != nil { await account.loadProduct() } }
-        }
     }
 
     // MARK: - Chat
@@ -90,11 +118,17 @@ struct CoachView: View {
                 }
                 .padding()
             }
+            .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
             .scrollEdgeEffectStyle(.soft, for: .bottom)
             .onTapGesture { inputFocused = false }
+            .onAppear { proxy.scrollTo("bottom", anchor: .bottom) }
+            .onChange(of: agent.chat.current.id) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
             .onChange(of: agent.chat.entries.count) { _, _ in
                 withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
+            }
+            .onChange(of: inputFocused) { _, focused in
+                if focused { Task { try? await Task.sleep(for: .milliseconds(350)); withAnimation { proxy.scrollTo("bottom", anchor: .bottom) } } }
             }
             .onChange(of: agent.isBusy) { _, busy in
                 if busy { withAnimation { proxy.scrollTo("bottom", anchor: .bottom) } }
@@ -361,5 +395,61 @@ struct FlowLayout: Layout {
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
         }
+    }
+}
+
+
+/// Past conversations: open, rename, delete.
+struct ChatHistorySheet: View {
+    @Bindable var chat: CoachChatStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var renaming: Conversation?
+    @State private var newTitle = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(chat.conversations) { c in
+                    Button {
+                        chat.open(c.id); dismiss()
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(c.title).lineLimit(1).foregroundStyle(.primary)
+                                Text(c.updatedAt, format: .relative(presentation: .named)).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if c.id == chat.current.id { Image(systemName: "checkmark").foregroundStyle(Color.accentColor) }
+                        }
+                    }
+                    .swipeActions {
+                        Button(role: .destructive) { chat.delete(c.id) } label: { Label("Delete", systemImage: "trash") }
+                        Button { renaming = c; newTitle = c.title } label: { Label("Rename", systemImage: "pencil") }.tint(.orange)
+                    }
+                    .contextMenu {
+                        Button("Rename", systemImage: "pencil") { renaming = c; newTitle = c.title }
+                        Button("Delete", systemImage: "trash", role: .destructive) { chat.delete(c.id) }
+                    }
+                }
+            }
+            .overlay {
+                if chat.conversations.count == 1 && chat.entries.isEmpty {
+                    ContentUnavailableView("No conversations yet", systemImage: "bubble.left.and.bubble.right", description: Text("Each chat you start shows up here."))
+                }
+            }
+            .navigationTitle("Chats").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { chat.newConversation(); dismiss() } label: { Label("New chat", systemImage: "square.and.pencil") }
+                }
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+            .alert("Rename chat", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+                TextField("Title", text: $newTitle)
+                Button("Save") { if let c = renaming { chat.rename(c.id, to: newTitle) }; renaming = nil }
+                Button("Cancel", role: .cancel) { renaming = nil }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
