@@ -24,6 +24,18 @@ struct ExpenseEntry: Codable, Identifiable, Hashable, Sendable {
     var category: String
     var note: String = ""
     var amount: Decimal
+    var recurringID: String? = nil
+}
+
+/// Salary on the 1st, rent on the 5th: applied once per month when the day arrives.
+struct RecurringEntry: Codable, Identifiable, Hashable, Sendable {
+    enum Kind: String, Codable, Sendable { case income, expense }
+    var id: String = UUID().uuidString
+    var kind: Kind
+    var name: String          // income source or expense category
+    var amount: Decimal
+    var dayOfMonth: Int       // 1…28
+    var note: String = ""
 }
 
 enum ExpenseCategory {
@@ -48,6 +60,7 @@ struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
     var date: Date
     var source: String
     var amount: Decimal
+    var recurringID: String? = nil
 }
 
 /// Study sessions (with a running timer that survives relaunch) and income entries.
@@ -65,6 +78,7 @@ final class TrackStore {
         var subjects: [Subject]?
         var expenses: [ExpenseEntry]?
         var budgets: [String: Decimal]?
+        var recurring: [RecurringEntry]?
     }
 
     private(set) var sessions: [StudySession] = []
@@ -73,6 +87,7 @@ final class TrackStore {
     private(set) var expenses: [ExpenseEntry] = []
     /// Monthly budget per category (flat, every month).
     private(set) var budgets: [String: Decimal] = [:]
+    private(set) var recurring: [RecurringEntry] = []
     var weeklyStudyGoalMinutes = 300 { didSet { save() } }
     var monthlyIncomeGoal: Decimal = 0 { didSet { save() } }
     private(set) var runningSince: Date?
@@ -97,6 +112,7 @@ final class TrackStore {
             subjects = s.subjects ?? []
             expenses = s.expenses ?? []
             budgets = s.budgets ?? [:]
+            recurring = s.recurring ?? []
             // Adopt topics from older sessions as subjects.
             for topic in Set(sessions.map(\.topic)) where topic != "Study" && !subjects.contains(where: { $0.name.caseInsensitiveCompare(topic) == .orderedSame }) {
                 subjects.append(Subject(name: topic))
@@ -274,6 +290,42 @@ final class TrackStore {
         save()
     }
 
+    // MARK: - Recurring
+
+    func upsertRecurring(_ r: RecurringEntry) {
+        var r = r; r.dayOfMonth = min(28, max(1, r.dayOfMonth))
+        if let i = recurring.firstIndex(where: { $0.id == r.id }) { recurring[i] = r } else { recurring.append(r) }
+        save()
+    }
+
+    func deleteRecurring(id: String) {
+        recurring.removeAll { $0.id == id }
+        save()
+    }
+
+    /// Adds this month's entries for every recurring item whose day has come (once per month).
+    /// Returns how many were added.
+    @discardableResult
+    func applyRecurring(now: Date = .now) -> Int {
+        guard let month = calendar.dateInterval(of: .month, for: now) else { return 0 }
+        let today = calendar.component(.day, from: now)
+        var added = 0
+        for r in recurring where r.dayOfMonth <= today {
+            let date = calendar.date(byAdding: .day, value: r.dayOfMonth - 1, to: month.start) ?? month.start
+            switch r.kind {
+            case .income:
+                guard !income.contains(where: { $0.recurringID == r.id && month.contains($0.date) }) else { continue }
+                income.append(IncomeEntry(date: date, source: r.name, amount: r.amount, recurringID: r.id))
+            case .expense:
+                guard !expenses.contains(where: { $0.recurringID == r.id && month.contains($0.date) }) else { continue }
+                expenses.append(ExpenseEntry(date: date, category: r.name, note: r.note, amount: r.amount, recurringID: r.id))
+            }
+            added += 1
+        }
+        if added > 0 { save() }
+        return added
+    }
+
     func expenses(monthOf date: Date) -> [ExpenseEntry] {
         guard let month = calendar.dateInterval(of: .month, for: date) else { return [] }
         return expenses.filter { month.contains($0.date) }.sorted { $0.date > $1.date }
@@ -341,6 +393,6 @@ final class TrackStore {
 
     private func save() {
         JSONFile.save(Snapshot(sessions: sessions, income: income, weeklyStudyGoalMinutes: weeklyStudyGoalMinutes, runningSince: runningSince, runningTopic: runningTopic,
-                               runningUntil: runningUntil, monthlyIncomeGoal: monthlyIncomeGoal, subjects: subjects, expenses: expenses, budgets: budgets), to: fileURL)
+                               runningUntil: runningUntil, monthlyIncomeGoal: monthlyIncomeGoal, subjects: subjects, expenses: expenses, budgets: budgets, recurring: recurring), to: fileURL)
     }
 }

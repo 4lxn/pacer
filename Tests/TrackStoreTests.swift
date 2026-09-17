@@ -162,3 +162,26 @@ final class MoneyTests: XCTestCase {
         XCTAssertEqual(again.expenses.count, 3)
     }
 }
+
+@MainActor
+final class RecurringTests: XCTestCase {
+    func testRecurringAppliesOncePerMonthWhenTheDayComes() throws {
+        var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "America/Mexico_City")!
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).json")
+        let t = TrackStore(fileURL: url, calendar: c)
+        t.upsertRecurring(RecurringEntry(kind: .income, name: "Salary", amount: 30000, dayOfMonth: 1))
+        t.upsertRecurring(RecurringEntry(kind: .expense, name: "Rent", amount: 12000, dayOfMonth: 5))
+        t.upsertRecurring(RecurringEntry(kind: .expense, name: "Netflix", amount: 219, dayOfMonth: 20))
+        let sep3 = c.date(from: DateComponents(year: 2026, month: 9, day: 3, hour: 12))!
+        XCTAssertEqual(t.applyRecurring(now: sep3), 1)            // salary yes, rent (5th) and Netflix (20th) not yet
+        XCTAssertEqual(t.applyRecurring(now: sep3), 0)            // idempotent
+        let sep17 = c.date(from: DateComponents(year: 2026, month: 9, day: 17, hour: 12))!
+        XCTAssertEqual(t.applyRecurring(now: sep17), 1)           // rent lands, dated the 5th
+        XCTAssertEqual(t.expenses(monthOf: sep17).first?.date, c.date(from: DateComponents(year: 2026, month: 9, day: 1, hour: 0))!.addingTimeInterval(4 * 86400))
+        XCTAssertEqual(t.expenseTotal(monthOf: sep17), 12000)
+        let oct2 = c.date(from: DateComponents(year: 2026, month: 10, day: 2, hour: 12))!
+        XCTAssertEqual(t.applyRecurring(now: oct2), 1)            // new month: salary again
+        XCTAssertEqual(t.incomeTotal(monthOf: oct2), 30000)
+        XCTAssertEqual(TrackStore(fileURL: url, calendar: c).recurring.count, 3)
+    }
+}
