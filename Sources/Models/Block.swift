@@ -20,6 +20,8 @@ struct Block: Codable, Identifiable, Hashable, Sendable {
     /// Default: on for window blocks of 20 min or more, off for fixed blocks (their start
     /// notification already covers them) and never for the anchor.
     var checkIn: Bool = false
+    /// Where it happens (Place id); nil = wherever you already are.
+    var place: String? = nil
 
     init(
         id: String,
@@ -31,7 +33,8 @@ struct Block: Codable, Identifiable, Hashable, Sendable {
         weekdays: Set<Int>? = nil,
         autoComplete: WorkoutMatch? = nil,
         weekdayNotes: [Int: String]? = nil,
-        checkIn: Bool? = nil
+        checkIn: Bool? = nil,
+        place: String? = nil
     ) {
         self.id = id
         self.label = label
@@ -43,6 +46,7 @@ struct Block: Codable, Identifiable, Hashable, Sendable {
         self.autoComplete = autoComplete
         self.weekdayNotes = weekdayNotes
         self.checkIn = checkIn ?? Block.defaultCheckIn(kind: kind, start: start, end: end, isAnchor: isAnchor)
+        self.place = place
     }
 
     static func defaultCheckIn(kind: BlockKind, start: DateComponents?, end: DateComponents?, isAnchor: Bool) -> Bool {
@@ -57,7 +61,7 @@ struct Block: Codable, Identifiable, Hashable, Sendable {
     }
 
     // Older plan.json files have no `checkIn`; decode it as its default.
-    private enum CodingKeys: String, CodingKey { case id, label, kind, start, end, isAnchor, weekdays, autoComplete, weekdayNotes, checkIn }
+    private enum CodingKeys: String, CodingKey { case id, label, kind, start, end, isAnchor, weekdays, autoComplete, weekdayNotes, checkIn, place }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -72,6 +76,7 @@ struct Block: Codable, Identifiable, Hashable, Sendable {
         weekdayNotes = try c.decodeIfPresent([Int: String].self, forKey: .weekdayNotes)
         checkIn = try c.decodeIfPresent(Bool.self, forKey: .checkIn)
             ?? Block.defaultCheckIn(kind: kind, start: start, end: end, isAnchor: isAnchor)
+        place = try c.decodeIfPresent(String.self, forKey: .place)
     }
 
     func note(on day: Date, calendar: Calendar) -> String? {

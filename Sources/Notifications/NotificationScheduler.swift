@@ -14,6 +14,8 @@ enum NotificationScheduler {
     static let checkInPrefix = "checkin-"
     // Moved blocks (one-shot start notification for a replanned block)
     static let movedPrefix = "moved-"
+    // "Leave now" reminders: start − travel, for blocks at another place
+    static let leavePrefix = "leave-"
     // Result of a replan done from a notification action; UNDO reverts it
     static let undoCategoryID = "REPLAN_UNDO"
     static let undoActionID = "UNDO"
@@ -101,6 +103,7 @@ enum NotificationScheduler {
         skipped: (String) -> Set<String>,
         movedIDs: (String) -> Set<String> = { _ in [] },
         checkIns: Bool = true,
+        places: Places = Places(),
         calendar: Calendar = .current
     ) -> [UNNotificationRequest] {
         var requests: [(Date, UNNotificationRequest)] = []
@@ -108,8 +111,20 @@ enum NotificationScheduler {
             guard let day = calendar.date(byAdding: .day, value: offset, to: now) else { continue }
             let dayKey = DayLogic.dayKey(day, calendar: calendar)
             let done = completed(dayKey), skip = skipped(dayKey), moved = movedIDs(dayKey)
-            for block in plan(day) where block.occurs(on: day, calendar: calendar) {
+            let dayPlan = plan(day)
+            let legs = DayLogic.travelLegs(dayPlan.filter { $0.occurs(on: day, calendar: calendar) }, places: places)
+            for block in dayPlan where block.occurs(on: day, calendar: calendar) {
                 guard !done.contains(block.id), !skip.contains(block.id) else { continue }
+                if let leg = legs[block.id], let start = block.startDate(on: day, calendar: calendar),
+                   let fire = calendar.date(byAdding: .minute, value: -leg.minutes, to: start), fire > now {
+                    let content = UNMutableNotificationContent()
+                    content.title = "Leave for \(block.label)"
+                    content.body = "\(leg.minutes) min to get there · starts \(block.start.map(DayLogic.clock) ?? "")"
+                    content.sound = .default
+                    content.userInfo = [blockIDKey: block.id, dayKeyKey: dayKey]
+                    content.threadIdentifier = "autopiloto"
+                    requests.append((fire, UNNotificationRequest(identifier: "\(leavePrefix)\(block.id)-\(dayKey)", content: content, trigger: trigger(fire, calendar))))
+                }
                 if checkIns, block.checkIn, let end = block.endDate(on: day, calendar: calendar),
                    let fire = calendar.date(byAdding: .minute, value: checkInDelayMinutes, to: end), fire > now {
                     let content = UNMutableNotificationContent()
@@ -137,7 +152,7 @@ enum NotificationScheduler {
 
     static func checkInIdentifier(_ blockID: String, dayKey: String) -> String { "\(checkInPrefix)\(blockID)-\(dayKey)" }
     static func movedIdentifier(_ blockID: String, dayKey: String) -> String { "\(movedPrefix)\(blockID)-\(dayKey)" }
-    static func isOneShot(_ identifier: String) -> Bool { identifier.hasPrefix(checkInPrefix) || identifier.hasPrefix(movedPrefix) }
+    static func isOneShot(_ identifier: String) -> Bool { identifier.hasPrefix(checkInPrefix) || identifier.hasPrefix(movedPrefix) || identifier.hasPrefix(leavePrefix) }
 
     /// Replaces only the `checkin-*` / `moved-*` requests (start notifications and snoozes are
     /// untouched). Keeps the total under `maxPending`: soonest win, the rest are logged.
@@ -149,6 +164,7 @@ enum NotificationScheduler {
         skipped: (String) -> Set<String>,
         movedIDs: (String) -> Set<String> = { _ in [] },
         checkIns: Bool = true,
+        places: Places = Places(),
         calendar: Calendar = .current,
         center: NotificationCenterClient = .live
     ) async -> Int {
@@ -156,7 +172,7 @@ enum NotificationScheduler {
         let stale = pending.filter(isOneShot)
         center.removePending(stale)
         let room = max(0, maxPending - (pending.count - stale.count))
-        let wanted = buildCheckIns(plan: plan, now: now, completed: completed, skipped: skipped, movedIDs: movedIDs, checkIns: checkIns, calendar: calendar)
+        let wanted = buildCheckIns(plan: plan, now: now, completed: completed, skipped: skipped, movedIDs: movedIDs, checkIns: checkIns, places: places, calendar: calendar)
         if wanted.count > room {
             log.warning("\(wanted.count) check-ins wanted, room for \(room); dropping the latest ones")
         }

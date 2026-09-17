@@ -12,6 +12,8 @@ final class DayStore {
     var dayEnd: DateComponents { didSet { saveSettings() } }
     /// Master switch for end-of-block check-ins (start notifications are unaffected).
     var checkInsEnabled = true { didSet { saveSettings() } }
+    /// Places and travel times between them (`places.json`).
+    var places = Places() { didSet { JSONFile.save(places, to: placesURL) } }
 
     private struct Settings: Codable {
         var dayEnd: DateComponents
@@ -21,6 +23,7 @@ final class DayStore {
     private let overridesURL: URL
     private let undoURL: URL
     private let settingsURL: URL
+    private let placesURL: URL
 
     static var defaultDirectory: URL { AppFiles.directory }
 
@@ -28,6 +31,8 @@ final class DayStore {
         overridesURL = directory.appendingPathComponent("overrides.json")
         undoURL = directory.appendingPathComponent("undo.json")
         settingsURL = directory.appendingPathComponent("settings.json")
+        placesURL = directory.appendingPathComponent("places.json")
+        if case .loaded(let p) = JSONFile.load(Places.self, from: placesURL) { places = p }
         if case .loaded(let o) = JSONFile.load([String: DayOverride].self, from: overridesURL) { overrides = o }
         if case .loaded(let u) = JSONFile.load(UndoRecord.self, from: undoURL) { undo = u }
         if case .loaded(let s) = JSONFile.load(Settings.self, from: settingsURL) {

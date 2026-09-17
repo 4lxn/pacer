@@ -32,17 +32,24 @@ struct CoachTools {
             "label": str("Short label"), "kind": enumOf(["fixed", "window", "free"]),
             "start": str("HH:MM, omit for free"), "end": str("HH:MM, omit for free"),
             "weekdays": ["type": "array", "items": ["type": "integer"], "description": "1=Sunday…7=Saturday; omit for every day"],
+            "place": str("Place name from get_places (optional)"),
             "today_only": ["type": "boolean", "description": "true = a one-off block for one day only (today, or `date`)"],
             "date": str("YYYY-MM-DD or 'tomorrow' for the one-off day; omit for today"),
         ], required: ["label", "kind"]),
         tool("set_block_note", "Attach a short note to a block for one day (e.g. what to do in that block). Empty note removes it.", [
             "id": str("Block id"), "note": str("The note"), "date": str("YYYY-MM-DD or 'tomorrow'; omit for today"),
         ], required: ["id", "note"]),
-        tool("update_block", "Change a block's label, times, kind or weekdays. Only pass the fields to change.", [
+        tool("update_block", "Change a block's label, times, kind, weekdays or place. Only pass the fields to change.", [
             "id": str("Block id from get_plan"), "label": str(""), "kind": enumOf(["fixed", "window", "free"]),
             "start": str("HH:MM"), "end": str("HH:MM"),
             "weekdays": ["type": "array", "items": ["type": "integer"], "description": "1=Sunday…7=Saturday"],
+            "place": str("Place name from get_places; empty string = wherever the user already is"),
         ], required: ["id"]),
+        tool("get_places", "The user's places (home, office, gym…) and travel minutes between them.", [:]),
+        tool("add_place", "Add or rename a place.", ["name": str(""), "note": str("Address or how to get there")], required: ["name"]),
+        tool("set_travel", "Set door-to-door minutes between two places (symmetric).", [
+            "from": str("Place name"), "to": str("Place name"), "minutes": ["type": "integer"],
+        ], required: ["from", "to", "minutes"]),
         tool("delete_block", "Delete a block. Ask the user first; then call with confirm=true. The anchor cannot be deleted.", [
             "id": str("Block id"), "confirm": ["type": "boolean"],
         ], required: ["id", "confirm"]),
@@ -168,11 +175,15 @@ struct CoachTools {
             let skipped = completions.skipped(dayKey: dayKey)
             let override = mutator.days.override(dayKey: dayKey)
             let extras = Set(override.extras.map(\.id))
+            let places = mutator.days.places
+            let legs = DayLogic.travelLegs(blocks, places: places)
             let lines = blocks.map { b -> String in
                 let time = b.start.map { NotificationScheduler.clock($0) + "–" + NotificationScheduler.clock(b.end ?? $0) } ?? "anytime"
                 let status = b.status(now: clock, completed: completed, skipped: skipped, calendar: calendar)
                 var line = "\(b.id) | \(time) | \(b.label) | \(b.kind.rawValue) | \(status)"
                 if b.isAnchor { line += " | anchor" }
+                if let place = places.name(id: b.place) { line += " | at \(place)" }
+                if let leg = legs[b.id] { line += " | \(leg.minutes) min travel from \(leg.from) first" }
                 if override.moved[b.id] != nil { line += " | moved" }
                 if extras.contains(b.id) { line += " | today only" }
                 if let note = override.notes[b.id] { line += " | note: \(note)" }
@@ -193,6 +204,7 @@ struct CoachTools {
                 block.checkIn = Block.defaultCheckIn(kind: kind, start: start, end: end, isAnchor: false)
             }
             block.weekdays = Self.weekdays(input["weekdays"])
+            if let name = input["place"] as? String, let p = mutator.days.places.list.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) { block.place = p.id }
             if input["today_only"] as? Bool == true || input["date"] != nil {
                 block.weekdays = nil
                 mutator.addExtra(block, dayKey: dayKey)
@@ -210,6 +222,11 @@ struct CoachTools {
             if let start = Self.hm(input["start"]) { block.start = start }
             if let end = Self.hm(input["end"]) { block.end = end }
             if input["weekdays"] != nil { block.weekdays = Self.weekdays(input["weekdays"]) }
+            if let name = input["place"] as? String {
+                if name.isEmpty { block.place = nil }
+                else if let p = mutator.days.places.list.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) { block.place = p.id }
+                else { return Result(output: "No place named \(name); call get_places or add_place first", isError: true) }
+            }
             if block.kind == .free { block.start = nil; block.end = nil } else if block.start == nil || block.end == nil {
                 return Result(output: "This kind needs start and end", isError: true)
             }
@@ -255,6 +272,29 @@ struct CoachTools {
             case .noRoom: return Result(output: mutator.lastChange?.summary ?? "No room today", summary: mutator.lastChange?.summary)
             default: return Result(output: mutator.lastChange?.summary ?? "Moved", summary: mutator.lastChange?.summary)
             }
+
+        case "get_places":
+            let places = mutator.days.places
+            var lines = places.list.map { p in "\(p.name)" + (p.note.isEmpty ? "" : " — \(p.note)") }
+            let pairs = places.list.enumerated().flatMap { i, a in places.list[(i + 1)...].compactMap { b -> String? in
+                let m = places.minutes(from: a.id, to: b.id); return m > 0 ? "\(a.name) ↔ \(b.name): \(m) min" : nil } }
+            lines.append(pairs.isEmpty ? "No travel times set." : "Travel: " + pairs.joined(separator: "; "))
+            return Result(output: lines.joined(separator: "\n"))
+
+        case "add_place":
+            guard let name = input["name"] as? String, !name.trimmingCharacters(in: .whitespaces).isEmpty else { return Result(output: "name is required", isError: true) }
+            mutator.days.places.upsert(Place(name: name, note: input["note"] as? String ?? ""))
+            return Result(output: "Saved place \(name)", summary: "Place: \(name)")
+
+        case "set_travel":
+            guard let from = input["from"] as? String, let to = input["to"] as? String, let minutes = Self.int(input["minutes"]),
+                  let a = mutator.days.places.list.first(where: { $0.name.caseInsensitiveCompare(from) == .orderedSame }),
+                  let b = mutator.days.places.list.first(where: { $0.name.caseInsensitiveCompare(to) == .orderedSame }) else {
+                return Result(output: "from, to (existing place names) and minutes are required", isError: true)
+            }
+            mutator.days.places.setTravel(a.id, b.id, minutes: minutes)
+            mutator.days.places = mutator.days.places   // re-arm leave reminders through the didSet consumers
+            return Result(output: "\(a.name) ↔ \(b.name): \(minutes) min", summary: "Travel \(a.name) ↔ \(b.name): \(minutes) min")
 
         case "reset_day":
             mutator.resetDay(day)

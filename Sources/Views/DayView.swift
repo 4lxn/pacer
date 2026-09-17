@@ -30,6 +30,7 @@ struct DayView: View {
     private var blocks: [Block] { DayLogic.sorted(mutator.effectivePlan(on: now)) }
     private var moved: Set<String> { Set(days.override(dayKey: mutator.dayKey(now)).moved.keys) }
     private var dayNotes: [String: String] { days.override(dayKey: mutator.dayKey(now)).notes }
+    private var legs: [String: (minutes: Int, from: String)] { DayLogic.travelLegs(blocks, places: days.places) }
     private var completed: Set<String> { store.completed(on: now) }
     private var skipped: Set<String> { store.skipped(on: now) }
     /// Skipped blocks leave the denominator: "n / N today" counts what is still on the plan.
@@ -94,7 +95,7 @@ struct DayView: View {
                 BlockDetailSheet(block: block, now: now, mutator: mutator) { editingBlock = $0 }
             }
             .sheet(item: $editingBlock) { block in
-                BlockEditor(block: plan.block(id: block.id) ?? block, isNew: false) { plan.upsert($0) } onDelete: { plan.delete(id: $0) }
+                BlockEditor(block: plan.block(id: block.id) ?? block, isNew: false, places: mutator.days.places.list) { plan.upsert($0) } onDelete: { plan.delete(id: $0) }
             }
             .sheet(isPresented: $addingToday) {
                 TodayOnlySheet(now: now) { mutator.addExtra($0, dayKey: mutator.dayKey(now)) }
@@ -115,7 +116,7 @@ struct DayView: View {
                 }
             }
         }
-        .sheet(isPresented: $editingPlan) { PlanView(plan: plan) }
+        .sheet(isPresented: $editingPlan) { PlanView(plan: plan, places: days.places.list) }
         .onAppear {
             #if DEBUG
             if CoachAccount.screenshotMode == "settings" { showingSettings = true }
@@ -207,6 +208,10 @@ struct DayView: View {
                 Text("Up next:").foregroundStyle(.secondary)
                 Text(next.label).fontWeight(.medium)
                 Text("at \(NotificationScheduler.clock(start))").foregroundStyle(.secondary).monospacedDigit()
+                if let leg = legs[next.id] {
+                    Text("· leave by \(DayLogic.clock(DayLogic.components(minutes: DayLogic.minutes(start) - leg.minutes)))")
+                        .foregroundStyle(Color.accentColor).monospacedDigit()
+                }
             }
             .font(.subheadline)
         }
@@ -236,10 +241,19 @@ struct DayView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(blocks) { block in
+                        if let leg = legs[block.id], title != "Done" {
+                            HStack(spacing: 6) {
+                                Image(systemName: "figure.walk.motion").font(.caption2)
+                                Text("\(leg.minutes) min from \(leg.from) · leave by \(block.start.map { DayLogic.clock(DayLogic.components(minutes: DayLogic.minutes($0) - leg.minutes)) } ?? "")")
+                                    .font(.caption).monospacedDigit()
+                            }
+                            .foregroundStyle(.tertiary)
+                            .padding(.leading, 116).padding(.top, 6)
+                        }
                         BlockRow(
                             block: block,
                             status: block.status(now: now, completed: completed, skipped: skipped, calendar: calendar),
-                            subtitle: dayNotes[block.id] ?? block.note(on: now, calendar: calendar),
+                            subtitle: [days.places.name(id: block.place), dayNotes[block.id] ?? block.note(on: now, calendar: calendar)].compactMap { $0 }.joined(separator: " · ").nilIfEmpty,
                             moved: moved.contains(block.id),
                             onToggle: { mutator.toggleDone(block.id, on: now) },
                             onOpen: { detail = block },

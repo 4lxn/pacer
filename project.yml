@@ -29,7 +29,7 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "7"
+        CURRENT_PROJECT_VERSION: "8"
         CODE_SIGN_ENTITLEMENTS: Autopiloto.entitlements
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
@@ -70,6 +70,7 @@ targets:
       - path: Sources/Models/BlockStatus.swift
       - path: Sources/Models/DayOverrides.swift
       - path: Sources/Models/DayTimeline.swift
+      - path: Sources/Models/Place.swift
       - path: Sources/Models/WorkoutMatch.swift
       - path: Sources/Store/AppFiles.swift
       - path: Sources/Store/JSONFile.swift
@@ -83,7 +84,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Pacer
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "7"
+        CURRENT_PROJECT_VERSION: "8"
         CODE_SIGN_ENTITLEMENTS: AutopilotoWidget.entitlements
         TARGETED_DEVICE_FAMILY: "1"
     info:

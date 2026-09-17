@@ -31,6 +31,16 @@ enum Replanner {
         var completed: Set<String>
         var skipped: Set<String>
         var calendar: Calendar = .current
+        var places = Places()
+    }
+
+    /// An obstacle on the day: fixed or in-progress block the moved one must not overlap, with
+    /// where it happens so travel fits on both sides.
+    struct Obstacle: Equatable {
+        var start: Int
+        var end: Int
+        var label: String
+        var place: String?
     }
 
     /// Find the first gap that fits the block after `max(now, end)`; else shrink; else no room.
@@ -41,7 +51,7 @@ enum Replanner {
         let from = roundUp(max(DayLogic.minutesOfDay(ctx.now, calendar: ctx.calendar), DayLogic.minutes(end)))
         let dayEnd = DayLogic.minutes(ctx.dayEnd)
         guard from < dayEnd else { return .noRoom }
-        let gaps = freeGaps(from: from, to: dayEnd, obstacles: obstacles(in: ctx, excluding: block.id))
+        let gaps = freeGaps(from: from, to: dayEnd, obstacles: obstacles(in: ctx, excluding: block.id), place: block.place, places: ctx.places)
         if let gap = gaps.first(where: { $0.1 - $0.0 >= dur }) {
             return apply(block, start: gap.0, minutes: dur, ctx: ctx, shrunk: false)
         }
@@ -59,8 +69,15 @@ enum Replanner {
         let s = DayLogic.minutes(start), e = s + dur
         if s < DayLogic.minutesOfDay(ctx.now, calendar: ctx.calendar) { return .rejected("That time already passed.") }
         if e > DayLogic.minutes(ctx.dayEnd) { return .rejected("That runs past the end of your day.") }
-        if let hit = obstacles(in: ctx, excluding: block.id).first(where: { $0.1 > s && $0.0 < e }) {
-            return .rejected("That overlaps \(hit.2).")
+        let obs = obstacles(in: ctx, excluding: block.id)
+        if let hit = obs.first(where: { $0.end > s && $0.start < e }) {
+            return .rejected("That overlaps \(hit.label).")
+        }
+        if let before = obs.last(where: { $0.end <= s }), ctx.places.minutes(from: before.place, to: block.place) > s - before.end {
+            return .rejected("Not enough time to get there from \(before.label) (\(ctx.places.minutes(from: before.place, to: block.place)) min).")
+        }
+        if let after = obs.first(where: { $0.start >= e }), ctx.places.minutes(from: block.place, to: after.place) > after.start - e {
+            return .rejected("Not enough time to get to \(after.label) afterwards (\(ctx.places.minutes(from: block.place, to: after.place)) min).")
         }
         return apply(block, start: s, minutes: dur, ctx: ctx, shrunk: false)
     }
@@ -69,25 +86,33 @@ enum Replanner {
 
     /// (start, end, label) of every not-done, not-skipped fixed block, plus any window block in
     /// progress right now. Other windows are pushable.
-    static func obstacles(in ctx: Context, excluding id: String) -> [(Int, Int, String)] {
+    static func obstacles(in ctx: Context, excluding id: String) -> [Obstacle] {
         let nowMin = DayLogic.minutesOfDay(ctx.now, calendar: ctx.calendar)
         return ctx.plan.compactMap { b in
             guard b.id != id, let s = b.start, let e = b.end, !ctx.completed.contains(b.id), !ctx.skipped.contains(b.id) else { return nil }
             let sm = DayLogic.minutes(s), em = DayLogic.minutes(e)
             let isCurrentWindow = b.kind == .window && sm <= nowMin && nowMin <= em
-            return b.kind == .fixed || isCurrentWindow ? (sm, em, b.label) : nil
-        }.sorted { $0.0 < $1.0 }
+            return b.kind == .fixed || isCurrentWindow ? Obstacle(start: sm, end: em, label: b.label, place: b.place) : nil
+        }.sorted { $0.start < $1.start }
     }
 
-    static func freeGaps(from: Int, to: Int, obstacles: [(Int, Int, String)]) -> [(Int, Int)] {
+    /// Free intervals between obstacles, each shrunk by the travel needed from the obstacle
+    /// before it and to the obstacle after it (for a block at `place`).
+    static func freeGaps(from: Int, to: Int, obstacles: [Obstacle], place: String? = nil, places: Places = Places()) -> [(Int, Int)] {
         var gaps: [(Int, Int)] = []
         var cursor = from
-        for (s, e, _) in obstacles where e > from {
-            if s > cursor { gaps.append((cursor, min(s, to))) }
-            cursor = max(cursor, e)
+        var previous: Obstacle?
+        for o in obstacles where o.end > from {
+            if o.start > cursor {
+                let lead = places.minutes(from: previous?.place, to: place)
+                let tail = places.minutes(from: place, to: o.place)
+                gaps.append((cursor + lead, min(o.start - tail, to)))
+            }
+            cursor = max(cursor, o.end)
+            previous = o
             if cursor >= to { break }
         }
-        if cursor < to { gaps.append((cursor, to)) }
+        if cursor < to { gaps.append((cursor + places.minutes(from: previous?.place, to: place), to)) }
         return gaps.filter { $0.1 > $0.0 }.map { (roundUp($0.0), $0.1) }.filter { $0.1 > $0.0 }
     }
 

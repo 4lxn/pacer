@@ -187,7 +187,7 @@ final class DayMutator {
                 let o = days.override(dayKey: key)
                 return Set(o.moved.keys).union(o.extras.map(\.id))
             },
-            checkIns: days.checkInsEnabled, calendar: calendar, center: center
+            checkIns: days.checkInsEnabled, places: days.places, calendar: calendar, center: center
         )
         metrics.markRearm(now())
     }
@@ -226,7 +226,8 @@ final class DayMutator {
         let key = dayKey(date)
         return Replanner.Context(
             plan: effectivePlan(on: date), override: days.override(dayKey: key), now: clock(for: date), dayEnd: days.dayEnd,
-            completed: completions.completed(dayKey: key), skipped: completions.skipped(dayKey: key), calendar: calendar
+            completed: completions.completed(dayKey: key), skipped: completions.skipped(dayKey: key), calendar: calendar,
+            places: days.places
         )
     }
 
