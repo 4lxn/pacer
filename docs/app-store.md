@@ -2,8 +2,8 @@
 
 ## Metadata
 
-- **Name:** Autopiloto
-- **Subtitle:** Your day on rails
+- **Name:** Pacer: Day on Pace
+- **Subtitle:** Your day, on pace
 - **Category:** Productivity (secondary: Health & Fitness)
 - **Age rating:** 4+
 - **Price:** Free; in-app subscription "Coach monthly" (`com.alan.autopiloto.coach.monthly`, group "Coach", 1-week free trial)
@@ -13,11 +13,17 @@
 
 ## Description
 
-Autopiloto runs your day so you don't have to hold it in your head.
+Pacer keeps your day on pace so you don't have to hold it in your head.
 
-Build a plan of blocks — wake up, train, work, lunch, study, wind down — and Autopiloto notifies you
+Build a plan of blocks — wake up, train, work, lunch, study, wind down — and Pacer notifies you
 when each fixed block starts. Tap Done or Snooze right from the lock screen. The anchor block breaks
 through Focus so you never miss the one thing that matters.
+
+Missed something? Five minutes after a block ends Pacer asks "did it happen?" — Done, Move it later
+or Skip today, right from the notification. Move it later finds free time later today and shifts
+what needs shifting; one tap undoes it. Your weekly plan never changes unless you change it.
+
+Glance at the Now/Next widget to see what's on and what comes next.
 
 Blocks close themselves. A run or a strength session in Apple Health (from your Garmin, Apple Watch
 or Strava) marks your training done. Twenty minutes of study marks your study block done.
@@ -53,7 +59,7 @@ partners: no" — it is our processor, not a partner collecting for its own purp
 
 ## Review notes (paste into App Review Information)
 
-Autopiloto is a personal planner. Reviewers can use it fully without an account:
+Pacer is a personal planner. Reviewers can use it fully without an account:
 
 1. Onboarding asks for wake and sleep times and builds a plan. Allow notifications to see block
    alerts; each fixed block schedules a repeating local notification with Done / Snooze actions,

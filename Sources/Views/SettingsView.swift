@@ -117,7 +117,7 @@ enum Diagnostics {
         let moved = i.pending.filter { $0.hasPrefix(NotificationScheduler.movedPrefix) }.count
         let pct = { (v: Double?) in v.map { String(format: "%.0f%%", $0 * 100) } ?? "—" }
         return """
-        Autopiloto \(i.version) — \(f.string(from: i.now))
+        Pacer \(i.version) — \(f.string(from: i.now))
         Plan: \(i.blocks) blocks, \(i.checkInBlocks) with check-ins (\(i.checkInsEnabled ? "on" : "off")), day ends \(DayLogic.clock(i.dayEnd))
         Notifications: \(i.notificationStatus); pending \(i.pending.count)/\(NotificationScheduler.maxPending) (starts \(starts), check-ins \(checkIns), moved \(moved)); last re-arm \(when(i.lastRearm))
         Health: \(i.healthAvailable ? (i.healthAuthorized ? "connected" : "not connected") : "unavailable"); last delivery \(when(i.lastHealthDelivery))

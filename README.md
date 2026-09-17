@@ -1,14 +1,19 @@
-# Autopiloto
+# Pacer
 
-Keeps your day on pace. An iOS planner of daily blocks that notifies you when each fixed block
-starts, asks "did it happen?" five minutes after a longer block ends (Done / Skip today from the
-lock screen), closes training blocks from Apple Health, and bundles the
-trackers around your day: training week and weight, meals and pantry, study timer, income, closet
-with laundry and outfits, and an AI Coach that knows your plan. Swift 6, SwiftUI, iOS 26+ (Liquid Glass), no
-third-party dependencies.
+**Pacer keeps your day on pace.** An iOS planner of daily blocks that notifies you when each fixed
+block starts, asks "did it happen?" five minutes after a longer block ends (Done / Move it later /
+Skip today from the lock screen), moves a missed block into free time later today with one tap
+(undoable), closes training blocks from Apple Health even while closed, shows Now/Next on the home
+screen, and bundles the trackers around your day: training week and weight, meals and pantry, study
+timer, income, closet with laundry and outfits, and an AI Coach that knows your plan and can change
+it. Swift 6, SwiftUI, iOS 26+ (Liquid Glass), no third-party dependencies.
 
-Tabs: **Today** (plan + editor) · **Train** (Apple Health) · **Food** · **Life** (study, income,
-closet) · **Coach**.
+Tabs: **Today** (plan + editor + settings) · **Train** (Apple Health) · **Food** · **Life** (study,
+income, closet) · **Coach**. Home screen widget: Now/Next.
+
+The product was named Autopiloto during development; the bundle id (`com.alan.autopiloto`), scheme,
+targets and repo keep that name. Everything the user sees says Pacer. How it fits together:
+`docs/ARCHITECTURE.md`.
 
 The only network code lives in `Sources/Coach/` (Claude Messages API, directly with the user's key
 or through `server/`). Everything else works with no network, ever. Docs: `docs/privacy.md`,
@@ -41,7 +46,7 @@ xcodebuild -scheme Autopiloto -destination 'platform=iOS,name=<your iPhone name>
 
 ## Apple Health (Train tab)
 
-Autopiloto reads workouts, weight and steps from Apple Health and marks the Run / Gym blocks done
+Pacer reads workouts, weight and steps from Apple Health and marks the Run / Gym blocks done
 when a matching workout lands today. Feed Health from your watch apps once:
 
 - Garmin Connect: More → Settings → Connected Apps → Apple Health → enable workouts, weight, steps.

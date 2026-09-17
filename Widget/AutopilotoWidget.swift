@@ -89,7 +89,7 @@ struct NowNextView: View {
                 title("Nothing left")
                 Text("See you tomorrow").font(.footnote).foregroundStyle(.secondary)
             case .noPlan:
-                eyebrow("AUTOPILOTO", color: .secondary)
+                eyebrow("PACER", color: .secondary)
                 title("Build your day")
                 Text("Open the app to start").font(.footnote).foregroundStyle(.secondary)
             }
