@@ -142,6 +142,9 @@ struct CoachTools {
         ], required: ["amount", "category"]),
         tool("delete_expense", "Delete an expense by id (from get_money_month).", ["id": str("")], required: ["id"]),
         tool("get_money_month", "This month's income, spend by category vs budgets, savings and rate, plus recent entries with ids.", [:]),
+        tool("add_recurring", "A monthly income or expense that repeats (salary, rent, a subscription); applied on its day each month.", [
+            "kind": enumOf(["income", "expense"]), "name": str("Source or category"), "amount": num(""), "day_of_month": ["type": "integer", "description": "1…28"],
+        ], required: ["kind", "name", "amount", "day_of_month"]),
         tool("set_budget", "Set a monthly budget for an expense category (0 removes it).", ["category": str(""), "amount": num("")], required: ["category", "amount"]),
         tool("set_income_goal", "Set the monthly income goal (0 clears it).", ["amount": num("")], required: ["amount"]),
         tool("start_focus", "Start a focus session now (shows in the Dynamic Island). minutes 0 = open-ended.", [
@@ -572,6 +575,13 @@ struct CoachTools {
             for c in track.expensesByCategory(monthOf: today) { lines.append("- \(c.category): \(c.amount)" + (track.budgets[c.category].map { " / budget \($0)" } ?? "")) }
             for e in track.expenses(monthOf: today).prefix(15) { lines.append("\(e.id) | \(e.date.formatted(date: .abbreviated, time: .omitted)) | \(e.category) | \(e.amount)" + (e.note.isEmpty ? "" : " | \(e.note)")) }
             return Result(output: lines.joined(separator: "\n"))
+
+        case "add_recurring":
+            guard let kindRaw = input["kind"] as? String, let kind = RecurringEntry.Kind(rawValue: kindRaw), let name = input["name"] as? String,
+                  let amount = Self.double(input["amount"]), let dayOfMonth = Self.int(input["day_of_month"]) else { return Result(output: "kind, name, amount and day_of_month are required", isError: true) }
+            track.upsertRecurring(RecurringEntry(kind: kind, name: name, amount: Decimal(amount), dayOfMonth: dayOfMonth))
+            let added = track.applyRecurring(now: today)
+            return Result(output: "\(name) repeats on day \(dayOfMonth)" + (added > 0 ? "; this month's entry added" : ""), summary: "Monthly \(kind.rawValue): \(name)")
 
         case "set_budget":
             guard let category = input["category"] as? String, let amount = Self.double(input["amount"]) else { return Result(output: "category and amount are required", isError: true) }

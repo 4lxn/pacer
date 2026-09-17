@@ -63,7 +63,7 @@ enum AppSection: String, CaseIterable, Codable, Identifiable, Sendable {
         case .train: ["get_training"]
         case .food: ["get_pantry", "add_pantry_item", "adjust_pantry", "delete_pantry_item", "get_grocery_list", "get_meals_today", "log_meal", "get_recipes", "add_recipe", "cook_recipe", "delete_recipe", "delete_meal", "set_targets", "add_preset", "delete_preset", "log_water"]
         case .focus: ["get_study", "add_study_session", "delete_study_session", "set_study_goal", "start_focus", "stop_focus"]
-        case .money: ["get_income", "add_income", "delete_income", "set_income_goal", "add_expense", "get_money", "set_budget", "delete_expense"]
+        case .money: ["get_income", "add_income", "delete_income", "set_income_goal", "add_expense", "get_money", "set_budget", "delete_expense", "add_recurring"]
         case .closet: ["get_closet", "add_garment", "update_garment", "delete_garment", "wear_outfit", "mark_washed", "set_closet_context"]
         }
     }

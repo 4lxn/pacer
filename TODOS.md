@@ -6,8 +6,6 @@ Deferred work with enough context to pick up cold. Effort is human-team → with
 
 - **Spanish localization** — the app's UI is English; Alan's market is MX. String catalog +
   `Localizable.xcstrings`, coach already answers in the user's language. Effort: L → M.
-- **Recurring money entries** — salary / rent repeat monthly; today each month is typed again.
-  Effort: S → S.
 
 - **Moved/one-off notifications beyond tomorrow** — `rearmCheckIns` covers today + tomorrow, so a
   block moved for the day after tomorrow gets its one-shot start only once that day is within the

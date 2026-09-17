@@ -12,6 +12,8 @@ struct MoneyContent: View {
     @State private var budgetDraft = ""
     @State private var editingIncomeGoal = false
     @State private var incomeGoalDraft = ""
+    @State private var editingRecurring: RecurringEntry?
+    @State private var addingRecurring = false
 
     private let calendar = Calendar.current
     private let tint = AppSection.money.tint
@@ -24,12 +26,15 @@ struct MoneyContent: View {
                 budgetsCard
                 trendCard
                 incomeCard
+                recurringCard
                 recentCard
             }
             .padding()
         }
         .background(Color(uiColor: .systemGroupedBackground))
-        .onAppear { now = .now }
+        .onAppear { now = .now; track.applyRecurring(now: now) }
+        .sheet(item: $editingRecurring) { r in RecurringForm(entry: r, currency: currency, categories: track.expenseCategories) { track.upsertRecurring($0); track.applyRecurring(now: now) } onDelete: { track.deleteRecurring(id: $0) } }
+        .sheet(isPresented: $addingRecurring) { RecurringForm(entry: RecurringEntry(kind: .expense, name: "", amount: 0, dayOfMonth: 1), isNew: true, currency: currency, categories: track.expenseCategories) { track.upsertRecurring($0); track.applyRecurring(now: now) } onDelete: { _ in } }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if let agent { Button { agent.queued = "Where did my money go this month, and what should I watch?" } label: { Label("Ask the coach", systemImage: "sparkles") } }
@@ -207,6 +212,46 @@ struct MoneyContent: View {
         .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
     }
 
+    // MARK: - Recurring
+
+    private var recurringCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Every month").font(.headline)
+                Spacer()
+                Button { addingRecurring = true } label: { Image(systemName: "plus") }.buttonStyle(.glass).controlSize(.small)
+            }
+            .padding(.horizontal, 4)
+            if track.recurring.isEmpty {
+                Text("Salary, rent, subscriptions — add them once and they land on their day each month.").font(.subheadline).foregroundStyle(.secondary).padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(track.recurring.sorted { $0.dayOfMonth < $1.dayOfMonth }) { r in
+                        Button { editingRecurring = r } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: r.kind == .income ? "arrow.down.left.circle.fill" : ExpenseCategory.symbol(r.name)).foregroundStyle(r.kind == .income ? tint : .secondary).frame(width: 28)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(r.name).foregroundStyle(Color.primary)
+                                    Text("day \(r.dayOfMonth)" + (r.note.isEmpty ? "" : " · \(r.note)")).font(.caption).foregroundStyle(Color.secondary)
+                                }
+                                Spacer()
+                                Text((r.kind == .income ? "+" : "−") + "\(r.amount.formatted(.currency(code: currency).precision(.fractionLength(0))))").monospacedDigit()
+                                    .foregroundStyle(r.kind == .income ? tint : Color.primary)
+                            }
+                            .font(.subheadline)
+                            .padding(.horizontal, 16).padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+                        if r.id != track.recurring.sorted(by: { $0.dayOfMonth < $1.dayOfMonth }).last?.id { Divider().padding(.leading, 56) }
+                    }
+                }
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+            }
+        }
+    }
+
     // MARK: - Recent
 
     private enum Row: Identifiable {
@@ -318,6 +363,53 @@ struct ExpenseForm: View {
                 }
             }
             .onAppear { amountFocused = true; category = categories.first ?? "Other" }
+        }
+    }
+}
+
+
+struct RecurringForm: View {
+    @State var entry: RecurringEntry
+    var isNew = false
+    let currency: String
+    let categories: [String]
+    let onSave: (RecurringEntry) -> Void
+    let onDelete: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var amount = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Picker("Kind", selection: $entry.kind) {
+                    Text("Income").tag(RecurringEntry.Kind.income)
+                    Text("Expense").tag(RecurringEntry.Kind.expense)
+                }
+                .pickerStyle(.segmented)
+                TextField(entry.kind == .income ? "Source (Salary…)" : "Category (Rent, Bills…)", text: $entry.name)
+                if entry.kind == .expense && !categories.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) { ForEach(categories, id: \.self) { c in Button(c) { entry.name = c }.buttonStyle(.glass).controlSize(.small) } }
+                    }
+                }
+                HStack { Text(currency).foregroundStyle(.secondary); TextField("Amount", text: $amount).keyboardType(.decimalPad) }
+                Stepper("Day of month: \(entry.dayOfMonth)", value: $entry.dayOfMonth, in: 1...28)
+                TextField("Note (optional)", text: $entry.note)
+                if !isNew { Section { Button("Delete", role: .destructive) { onDelete(entry.id); dismiss() } } }
+            }
+            .navigationTitle(isNew ? "Every month" : entry.name).navigationBarTitleDisplayMode(.inline)
+            .onAppear { amount = entry.amount > 0 ? "\(entry.amount)" : "" }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        var e = entry
+                        e.amount = Decimal(string: amount.replacingOccurrences(of: ",", with: "."), locale: Locale(identifier: "en_US_POSIX")) ?? 0
+                        onSave(e); dismiss()
+                    }
+                    .disabled(entry.name.trimmingCharacters(in: .whitespaces).isEmpty || (Decimal(string: amount.replacingOccurrences(of: ",", with: "."), locale: Locale(identifier: "en_US_POSIX")) ?? 0) <= 0)
+                }
+            }
         }
     }
 }
