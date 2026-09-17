@@ -30,6 +30,13 @@ enum NotificationScheduler {
 
     private static let log = Logger(subsystem: "com.alan.autopiloto", category: "notifications")
 
+    /// The bundled chime (Resources/pacer.caf) or nil for the system sound. Set from settings at
+    /// launch and when changed; read when requests are built.
+    nonisolated(unsafe) static var soundName: String? = "pacer.caf"
+    static var sound: UNNotificationSound {
+        soundName.map { UNNotificationSound(named: UNNotificationSoundName($0)) } ?? .default
+    }
+
     // MARK: - Start notifications (unchanged scheme: repeating, survive force-quit)
 
     /// One repeating calendar trigger per `.fixed` block. Blocks limited to some weekdays get one
@@ -60,7 +67,7 @@ enum NotificationScheduler {
         if let start = block.start, let end = block.end {
             content.body = "\(DayLogic.clock(start)) – \(DayLogic.clock(end))"
         }
-        content.sound = .default
+        content.sound = sound
         content.categoryIdentifier = categoryID
         content.userInfo = [blockIDKey: block.id]
         content.threadIdentifier = "autopiloto"
@@ -81,7 +88,7 @@ enum NotificationScheduler {
         let content = UNMutableNotificationContent()
         content.title = topic.isEmpty ? "Focus block over" : "\(topic): focus block over"
         content.body = "Take five, then stop or keep going."
-        content.sound = .default
+        content.sound = sound
         content.threadIdentifier = "autopiloto-study"
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, end.timeIntervalSinceNow), repeats: false)
         try? await center.add(UNNotificationRequest(identifier: focusIdentifier, content: content, trigger: trigger))
@@ -120,7 +127,7 @@ enum NotificationScheduler {
                     let content = UNMutableNotificationContent()
                     content.title = "Leave for \(block.label)"
                     content.body = "\(leg.minutes) min to get there · starts \(block.start.map(DayLogic.clock) ?? "")"
-                    content.sound = .default
+                    content.sound = sound
                     content.userInfo = [blockIDKey: block.id, dayKeyKey: dayKey]
                     content.threadIdentifier = "autopiloto"
                     requests.append((fire, UNNotificationRequest(identifier: "\(leavePrefix)\(block.id)-\(dayKey)", content: content, trigger: trigger(fire, calendar))))
@@ -130,7 +137,7 @@ enum NotificationScheduler {
                     let content = UNMutableNotificationContent()
                     content.title = "\(block.label) ended"
                     content.body = "Did it happen?"
-                    content.sound = .default
+                    content.sound = sound
                     content.categoryIdentifier = checkInCategoryID
                     content.userInfo = [blockIDKey: block.id, dayKeyKey: dayKey]
                     content.threadIdentifier = "autopiloto-checkin"

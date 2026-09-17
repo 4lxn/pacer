@@ -12,6 +12,9 @@ settings:
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
     GCC_TREAT_WARNINGS_AS_ERRORS: YES
     CODE_SIGN_STYLE: Automatic
+    # Xcode 26 compilation caching: unchanged files are not recompiled across clean builds / branches.
+    COMPILATION_CACHE_ENABLE_CACHING: YES
+    SWIFT_ENABLE_EXPLICIT_MODULES: YES
     # Set your Apple Developer Team ID here (or pick the team in Xcode > Signing & Capabilities).
     DEVELOPMENT_TEAM: UK3KUGFP25
 targets:
@@ -21,7 +24,9 @@ targets:
     sources:
       - path: Sources
       - path: Assets.xcassets
+      - path: Resources
       - path: Widget/WidgetViews.swift   # debug widget gallery renders the real widget views
+      - path: Widget/PacerActivity.swift  # Live Activity attributes + intent, shared with the extension
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.alan.autopiloto
@@ -29,7 +34,7 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "8"
+        CURRENT_PROJECT_VERSION: "9"
         CODE_SIGN_ENTITLEMENTS: Autopiloto.entitlements
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
@@ -48,6 +53,7 @@ targets:
       properties:
         BGTaskSchedulerPermittedIdentifiers: [com.alan.autopiloto.rearm]
         UIBackgroundModes: [fetch]
+        NSSupportsLiveActivities: true
         CFBundleURLTypes:
           - CFBundleURLName: com.alan.autopiloto
             CFBundleURLSchemes: [autopiloto]
@@ -84,7 +90,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Pacer
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "8"
+        CURRENT_PROJECT_VERSION: "9"
         CODE_SIGN_ENTITLEMENTS: AutopilotoWidget.entitlements
         TARGETED_DEVICE_FAMILY: "1"
     info:

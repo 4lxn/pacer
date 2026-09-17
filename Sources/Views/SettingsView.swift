@@ -41,6 +41,12 @@ struct SettingsView: View {
 
                 Section("Notifications") {
                     LabeledContent("Permission", value: statusText)
+                    Picker("Sound", selection: $days.sound) {
+                        Text("Pacer chime").tag("pacer")
+                        Text("System default").tag("system")
+                    }
+                    Button("Play the chime", systemImage: "speaker.wave.2") { SoundPreview.play() }
+                    Toggle("Live Activity for the current block", isOn: $days.liveActivity)
                     if notificationStatus == .denied {
                         Button("Open iOS Settings") { open(URL(string: UIApplication.openSettingsURLString)) }
                     }
@@ -81,6 +87,10 @@ struct SettingsView: View {
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .sheet(isPresented: $editingProfile) { ProfileEditor() }
             .task { notificationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus }
+            .onChange(of: days.sound) { _, sound in
+                NotificationScheduler.soundName = sound == "pacer" ? "pacer.caf" : nil
+                Task { await NotificationScheduler.register(plan.blocks) }   // repeating starts carry the sound
+            }
         }
     }
 
@@ -93,6 +103,19 @@ struct SettingsView: View {
     }
 
     private func open(_ url: URL?) { if let url { UIApplication.shared.open(url) } }
+}
+
+import AVFoundation
+
+/// Plays the bundled chime once, for the Settings button.
+@MainActor
+enum SoundPreview {
+    private static var player: AVAudioPlayer?
+    static func play() {
+        guard let url = Bundle.main.url(forResource: "pacer", withExtension: "caf") else { return }
+        player = try? AVAudioPlayer(contentsOf: url)
+        player?.play()
+    }
 }
 
 /// Everything needed to debug a report from a tester, as text. Pure over its inputs.

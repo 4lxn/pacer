@@ -190,6 +190,17 @@ final class DayMutator {
             checkIns: days.checkInsEnabled, places: days.places, calendar: calendar, center: center
         )
         metrics.markRearm(now())
+        await syncLiveActivity()
+    }
+
+    /// The Live Activity mirrors the current block; off in settings ends it.
+    func syncLiveActivity() async {
+        let current = now()
+        guard days.liveActivity else { await LiveActivityController.endAll(); return }
+        let key = dayKey(current)
+        let snapshot = DayTimeline.snapshot(at: current, blocks: effectivePlan(on: current), completed: completions.completed(dayKey: key),
+                                            skipped: completions.skipped(dayKey: key), hasPlan: !plan.needsOnboarding, calendar: calendar)
+        await LiveActivityController.sync(snapshot: snapshot, places: days.places, calendar: calendar)
     }
 
     /// Waits for the queued notification work. Notification actions call this before returning so
@@ -213,7 +224,7 @@ final class DayMutator {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        content.sound = .default
+        content.sound = NotificationScheduler.sound
         content.threadIdentifier = "autopiloto-replan"
         if let category { content.categoryIdentifier = category }
         if let dayKey { content.userInfo = [NotificationScheduler.dayKeyKey: dayKey] }
