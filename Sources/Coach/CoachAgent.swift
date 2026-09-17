@@ -13,6 +13,8 @@ final class CoachAgent {
     private(set) var remaining: Int?
     /// A prompt another section wants asked (e.g. Food → "Plan my meals"). The Coach tab picks it up.
     var queued: String?
+    /// Text of the answer being streamed right now, before it lands in the chat.
+    private(set) var partial = ""
 
     static let maxIterations = 8
 
@@ -39,13 +41,15 @@ final class CoachAgent {
                 return
             }
             let response: CoachClient.AgentResponse
+            partial = ""
             do {
-                let (data, status) = try await client.send(request)
-                response = try CoachClient.parseAgent(data, status: status)
+                response = try await client.streamAgent(request) { [weak self] text in self?.partial += text }
             } catch {
+                partial = ""
                 lastError = error.localizedDescription
                 return
             }
+            partial = ""
             remaining = response.remaining
             chat.appendAssistant(content: response.content)
 

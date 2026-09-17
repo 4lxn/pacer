@@ -137,7 +137,9 @@ struct CoachView: View {
                 LazyVStack(alignment: .leading, spacing: 10) {
                     if agent.chat.entries.isEmpty { emptyState }
                     ForEach(agent.chat.entries) { entry in bubble(entry).id(entry.id) }
-                    if agent.isBusy {
+                    if agent.isBusy && !agent.partial.isEmpty {
+                        bubble(ChatEntry(id: "partial", role: .assistant, text: agent.partial)).id("busy")
+                    } else if agent.isBusy {
                         HStack(spacing: 8) { ProgressView(); Text("Thinking…").foregroundStyle(.secondary) }
                             .padding(.horizontal, 4).id("busy")
                     }
@@ -157,6 +159,7 @@ struct CoachView: View {
             .onChange(of: agent.chat.entries.count) { _, _ in
                 withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
             }
+            .onChange(of: agent.partial.count) { _, _ in proxy.scrollTo("bottom", anchor: .bottom) }
             .onChange(of: inputFocused) { _, focused in
                 if focused { Task { try? await Task.sleep(for: .milliseconds(350)); withAnimation { proxy.scrollTo("bottom", anchor: .bottom) } } }
             }
