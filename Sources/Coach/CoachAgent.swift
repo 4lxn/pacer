@@ -11,6 +11,8 @@ final class CoachAgent {
     private(set) var isBusy = false
     private(set) var lastError: String?
     private(set) var remaining: Int?
+    /// A prompt another section wants asked (e.g. Food → "Plan my meals"). The Coach tab picks it up.
+    var queued: String?
 
     static let maxIterations = 8
 

@@ -20,6 +20,8 @@ struct AutopilotoApp: App {
 /// SwiftUI scene is alive.
 final class AppDelegate: NSObject, UIApplicationDelegate {
     static let rearmTaskID = "com.alan.autopiloto.rearm"
+    /// App Intents run in this process; they reach the stores through here.
+    nonisolated(unsafe) static weak var shared: AppDelegate?
 
     private let migrated: Void = AppFiles.migrateLegacyFiles()   // before any store loads
     let store = CompletionStore()
@@ -43,6 +45,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        Self.shared = self
         #if DEBUG
         // Screenshots / UI checks: seed the sample plan so onboarding doesn't show.
         if CoachAccount.screenshotMode != nil, plan.needsOnboarding { plan.replace(with: Plan.blocks) }

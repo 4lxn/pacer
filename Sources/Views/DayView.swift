@@ -44,6 +44,17 @@ struct DayView: View {
     private var missed: [Block] { blocks.filter { status($0) == .missed } }
     private var finished: [Block] { blocks.filter { completed.contains($0.id) || skipped.contains($0.id) } }
     private var current: Block? { DayLogic.currentBlock(blocks, now: now, completed: completed, skipped: skipped, calendar: calendar) }
+    private func score(_ day: Date) -> Double? {
+        let key = mutator.dayKey(day)
+        return DayLogic.dayScore(mutator.effectivePlan(on: day), completed: store.completed(dayKey: key), skipped: store.skipped(dayKey: key))
+    }
+    private var streak: Int { DayLogic.dayStreak(now: now, calendar: calendar, score: score) }
+    /// The day is winding down: every timed block has ended, or it's the last hour before day end.
+    private var isEvening: Bool {
+        let lastEnd = blocks.compactMap { $0.endDate(on: now, calendar: calendar) }.max()
+        let dayEnd = calendar.date(bySettingHour: days.dayEnd.hour ?? 23, minute: days.dayEnd.minute ?? 0, second: 0, of: now) ?? now
+        return (lastEnd.map { now > $0 } ?? false) || now > dayEnd.addingTimeInterval(-3600)
+    }
 
     var body: some View {
         NavigationStack {
@@ -67,7 +78,8 @@ struct DayView: View {
                     .transition(.blurReplace)
                     upNext
                     section("Left today", count: leftToday.count, blocks: leftToday, empty: "Nothing left on the plan.")
-                    if !missed.isEmpty {
+                    if isEvening && !missed.isEmpty { review }
+                    else if !missed.isEmpty {
                         section("Missed", count: missed.count, blocks: missed, empty: nil, hint: "Hold a row to move it later or skip it today.")
                     }
                     if !finished.isEmpty { section("Done", count: nil, blocks: finished, empty: nil) }
@@ -290,7 +302,14 @@ struct DayView: View {
             return (key, DayLogic.dayScore(mutator.effectivePlan(on: day), completed: store.completed(dayKey: key), skipped: store.skipped(dayKey: key)))
         }
         return VStack(alignment: .leading, spacing: 6) {
-            Text("Last 14 days").font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Text("Last 14 days").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                if streak > 0 {
+                    Label("\(streak)-day streak", systemImage: "flame.fill").font(.caption.weight(.medium)).foregroundStyle(.orange)
+                        .contentTransition(.numericText())
+                }
+            }
             HStack(alignment: .bottom, spacing: 4) {
                 ForEach(days, id: \.key) { day in
                     let score = day.score ?? 0
@@ -308,6 +327,49 @@ struct DayView: View {
                 }
             }
             .animation(.snappy, value: doneCount)
+        }
+    }
+
+    /// End of day: what slipped, one decision per row. Blocks that aren't daily can move to tomorrow.
+    private var review: some View {
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: now) ?? now
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("Day review").font(.headline)
+                Text("\(missed.count)").font(.caption.weight(.semibold)).monospacedDigit()
+                    .padding(.horizontal, 7).padding(.vertical, 2)
+                    .background(Color.red.opacity(0.12), in: Capsule()).foregroundStyle(.red)
+                Spacer()
+                Text("\(doneCount) of \(counted.count) done").font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 4)
+            VStack(spacing: 0) {
+                ForEach(missed) { block in
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(block.label).lineLimit(1)
+                            Text(block.start.map(DayLogic.clock) ?? "any").font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                        }
+                        Spacer()
+                        Button { mutator.setDone(block.id, true, dayKey: mutator.dayKey(now)) } label: { Image(systemName: "checkmark").frame(width: 30, height: 30) }
+                            .buttonStyle(.glassProminent).controlSize(.small).accessibilityLabel("Did it")
+                        if !block.occurs(on: tomorrow, calendar: calendar) {
+                            Button {
+                                mutator.addExtra(Block(id: "carry-\(block.id)-\(mutator.dayKey(tomorrow))", label: block.label, kind: block.kind, start: block.start, end: block.end, place: block.place), dayKey: mutator.dayKey(tomorrow))
+                                mutator.skipToday(block.id, dayKey: mutator.dayKey(now))
+                            } label: { Image(systemName: "arrow.uturn.forward").frame(width: 30, height: 30) }
+                            .buttonStyle(.glass).controlSize(.small).accessibilityLabel("Move to tomorrow")
+                        }
+                        Button { mutator.skipToday(block.id, dayKey: mutator.dayKey(now)) } label: { Image(systemName: "minus").frame(width: 30, height: 30) }
+                            .buttonStyle(.glass).controlSize(.small).accessibilityLabel("Skip today")
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    if block.id != missed.last?.id { Divider().padding(.leading, 16) }
+                }
+            }
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+            Text("✓ did it · ↪ tomorrow (blocks that aren't daily) · − skip. Skipped blocks leave today's count.").font(.caption2).foregroundStyle(.tertiary).padding(.horizontal, 4)
         }
     }
 

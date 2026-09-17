@@ -89,6 +89,7 @@ struct CoachTools {
             "name": str("Meal name"), "kcal": ["type": "integer"], "protein_grams": ["type": "integer"],
             "carbs_grams": ["type": "integer"], "fat_grams": ["type": "integer"],
         ], required: ["name", "kcal", "protein_grams"]),
+        tool("log_water", "Add glasses of water for today (negative to remove).", ["glasses": ["type": "integer"]], required: ["glasses"]),
         tool("get_recipes", "Saved recipes with ingredients, macros and whether the pantry can cook them now.", [:]),
         tool("add_recipe", "Save or update a recipe: ingredients matched to pantry items by name.", [
             "name": str("Recipe name"), "kcal": ["type": "integer"], "protein_grams": ["type": "integer"],
@@ -378,6 +379,11 @@ struct CoachTools {
             let m = food.macros(on: today)
             return Result(output: "Logged. Today: \(m.kcal)/\(food.targets.kcal) kcal, \(m.proteinGrams)/\(food.targets.proteinGrams) g protein",
                           summary: "Logged \(name) (\(kcal) kcal, \(protein) g)")
+
+        case "log_water":
+            let n = Self.int(input["glasses"]) ?? 1
+            food.logWater(n, on: today)
+            return Result(output: "Water today: \(food.water(on: today)) / \(food.waterTarget)", summary: "Water \(food.water(on: today))/\(food.waterTarget)")
 
         case "get_recipes":
             guard !food.recipes.isEmpty else { return Result(output: "No recipes saved.") }
