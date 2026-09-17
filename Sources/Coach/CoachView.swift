@@ -285,6 +285,7 @@ struct CoachView: View {
 struct ProfileEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var text = CoachProfile.load()
+    @State private var answering = false
 
     var body: some View {
         NavigationStack {
@@ -295,10 +296,42 @@ struct ProfileEditor: View {
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) { Button("Save") { CoachProfile.save(text); dismiss() } }
-                    ToolbarItem(placement: .bottomBar) {
-                        Button("Reset to template", role: .destructive) { text = CoachProfile.template }
+                    ToolbarItemGroup(placement: .bottomBar) {
+                        Button("Answer the questions again", systemImage: "questionmark.bubble") { answering = true }
+                        Spacer()
+                        Button("Reset", role: .destructive) { text = CoachProfile.template }
                     }
                 }
+                .sheet(isPresented: $answering) {
+                    ProfileQuestionsSheet { composed in text = composed }
+                }
+        }
+    }
+}
+
+/// The five onboarding questions, re-askable from the profile editor.
+struct ProfileQuestionsSheet: View {
+    let onCompose: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var answers: [String: String] = [:]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                ForEach(CoachProfile.questions) { q in
+                    Section {
+                        TextField(q.placeholder, text: Binding(get: { answers[q.id] ?? "" }, set: { answers[q.id] = $0 }), axis: .vertical)
+                            .lineLimit(2...5)
+                    } header: { Text(q.title) } footer: { Text(q.hint) }
+                }
+            }
+            .navigationTitle("About you").navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Build profile") { onCompose(CoachProfile.compose(answers: answers)); dismiss() }
+                }
+            }
         }
     }
 }
