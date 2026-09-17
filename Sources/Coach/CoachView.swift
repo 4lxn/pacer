@@ -67,6 +67,13 @@ struct CoachView: View {
             }
             .sheet(isPresented: $showingHistory) { ChatHistorySheet(chat: agent.chat) }
             .task { if CoachClient.proxyURL != nil { await account.loadProduct() } }
+            .task(id: agent.queued) {
+                guard let prompt = agent.queued, canAsk else { return }
+                agent.queued = nil
+                agent.chat.newConversation()
+                draft = prompt
+                send()
+            }
             .onAppear {
                 #if DEBUG
                 if CoachAccount.screenshotMode == "chat", agent.chat.entries.isEmpty {

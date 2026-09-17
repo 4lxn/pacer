@@ -64,6 +64,22 @@ extension DayLogic {
         }
     }
 
+    /// Consecutive days (ending today or yesterday) with a score ≥ `threshold`; today counts once it qualifies.
+    static func dayStreak(now: Date, threshold: Double = 0.8, calendar: Calendar = .current, score: (Date) -> Double?) -> Int {
+        var streak = 0
+        var day = now
+        if (score(now) ?? 0) < threshold {
+            guard let y = calendar.date(byAdding: .day, value: -1, to: now), (score(y) ?? 0) >= threshold else { return 0 }
+            day = y
+        }
+        while (score(day) ?? 0) >= threshold, streak < 365 {
+            streak += 1
+            guard let previous = calendar.date(byAdding: .day, value: -1, to: day) else { break }
+            day = previous
+        }
+        return streak
+    }
+
     /// done / counted for a day; nil when nothing was planned.
     static func dayScore(_ blocks: [Block], completed: Set<String>, skipped: Set<String>) -> Double? {
         let counted = blocks.filter { !skipped.contains($0.id) }

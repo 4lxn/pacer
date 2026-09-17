@@ -111,3 +111,19 @@ final class FoodDepthTests: XCTestCase {
         XCTAssertEqual(MealGuess.parse("{\"name\":\"\",\"kcal\":-5,\"proteinGrams\":1}")?.name, "Meal")
     }
 }
+
+@MainActor
+final class WaterTests: XCTestCase {
+    func testWaterAndAverages() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).json")
+        let food = FoodStore(fileURL: url)
+        food.logWater(3); food.logWater(-1); food.logWater(-5)
+        XCTAssertEqual(food.water(on: .now), 0)
+        food.logWater(4)
+        XCTAssertEqual(FoodStore(fileURL: url).water(on: .now), 4)
+        food.log(name: "A", kcal: 500, proteinGrams: 40, saveAsPreset: false)
+        food.log(name: "B", kcal: 700, proteinGrams: 50, at: Calendar.current.date(byAdding: .day, value: -1, to: .now)!, saveAsPreset: false)
+        let avg = food.averages(days: 7, now: .now)
+        XCTAssertEqual(avg.loggedDays, 2); XCTAssertEqual(avg.kcal, 600); XCTAssertEqual(avg.protein, 45)
+    }
+}

@@ -131,3 +131,44 @@ extension DayLogic {
         }
     }
 }
+
+
+/// Personal bests over the loaded window (8 weeks).
+struct TrainingBests: Equatable {
+    var fastest5kPace: Double?      // min/km over runs ≥ 5 km
+    var longestRunKm: Double?
+    var longestSessionMinutes: Int?
+    var biggestWeekMinutes: Int?
+
+    static func make(_ workouts: [WorkoutSummary], calendar: Calendar) -> TrainingBests {
+        var b = TrainingBests()
+        for w in workouts {
+            if w.activity == .run, let m = w.distanceMeters, m >= 5000, let pace = w.paceMinPerKm { b.fastest5kPace = min(b.fastest5kPace ?? pace, pace) }
+            if w.activity == .run, let m = w.distanceMeters { b.longestRunKm = max(b.longestRunKm ?? 0, m / 1000) }
+            b.longestSessionMinutes = max(b.longestSessionMinutes ?? 0, Int(w.duration / 60))
+        }
+        var weeks: [Date: Int] = [:]
+        for w in workouts { if let start = calendar.dateInterval(of: .weekOfYear, for: w.start)?.start { weeks[start, default: 0] += Int(w.duration / 60) } }
+        b.biggestWeekMinutes = weeks.values.max()
+        return b
+    }
+}
+
+/// One line about how ready you are, from last night and the resting heart rate.
+enum Readiness {
+    static func line(sleepMinutes: Int?, restingHR: Int?, typicalRestingHR: Int? = nil) -> (text: String, good: Bool) {
+        var notes: [String] = []
+        var good = true
+        if let s = sleepMinutes {
+            if s < 6 * 60 { notes.append("short night (\(s / 60) h \(s % 60) min)"); good = false }
+            else if s >= 7 * 60 { notes.append("slept \(s / 60) h \(s % 60) min") }
+            else { notes.append("\(s / 60) h \(s % 60) min of sleep") }
+        }
+        if let hr = restingHR {
+            if let typical = typicalRestingHR, hr >= typical + 5 { notes.append("resting HR up (\(hr) vs \(typical))"); good = false }
+            else { notes.append("resting HR \(hr)") }
+        }
+        guard !notes.isEmpty else { return ("No sleep or heart data yet.", true) }
+        return ((good ? "Ready: " : "Go easy: ") + notes.joined(separator: ", ") + ".", good)
+    }
+}

@@ -61,6 +61,7 @@ struct RootView: View {
             WidgetCenter.shared.reloadAllTimelines()
             Task { await NotificationScheduler.register(blocks) }
         }
+        .onChange(of: agent.queued) { _, q in if q != nil { selectedTab = AppSection.coach.rawValue } }
         .onOpenURL { url in
             if let host = url.host, AppSection(rawValue: host) != nil { selectedTab = host }
         }
@@ -71,7 +72,7 @@ struct RootView: View {
         switch section {
         case .today: DayView(store: store, plan: plan, days: days, mutator: mutator, metrics: metrics, health: health, track: track, account: account, sections: sections)
         case .train: TrainView(health: health, mutator: mutator)
-        case .food: FoodView(food: food, account: account)
+        case .food: FoodView(food: food, account: account, agent: agent)
         case .focus: FocusTab(track: track)
         case .money: MoneyTab(track: track)
         case .closet: ClosetTab(wardrobe: wardrobe, account: account)

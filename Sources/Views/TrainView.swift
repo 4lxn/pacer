@@ -10,6 +10,10 @@ struct TrainView: View {
     @State private var editingGoal = false
     @State private var goalDraft = ""
     @AppStorage("weightGoalKg") private var weightGoal = 0.0
+    @AppStorage("trainGoalRuns") private var goalRuns = 3
+    @AppStorage("trainGoalLifts") private var goalLifts = 3
+    @AppStorage("trainGoalMinutes") private var goalMinutes = 300
+    @State private var editingGoals = false
     @FocusState private var weightFocused: Bool
 
     private let calendar = Calendar.current
@@ -30,6 +34,7 @@ struct TrainView: View {
                     } else {
                         todayCard
                         weekCard
+                        bestsCard
                         weightCard
                         if !health.stepsByDay.isEmpty { stepsCard }
                         recentCard
@@ -44,6 +49,7 @@ struct TrainView: View {
             .navigationTitle("Train")
             .refreshable { await reload() }
             .task { await reload() }
+            .sheet(isPresented: $editingGoals) { TrainGoalsForm(runs: $goalRuns, lifts: $goalLifts, minutes: $goalMinutes) }
             .alert("Weight goal (kg)", isPresented: $editingGoal) {
                 TextField("kg", text: $goalDraft).keyboardType(.decimalPad)
                 Button("Save") { weightGoal = Double(goalDraft.replacingOccurrences(of: ",", with: ".")) ?? 0 }
@@ -66,6 +72,9 @@ struct TrainView: View {
     private var todayCard: some View {
         card {
             Text("Today").font(.headline)
+            let readiness = Readiness.line(sleepMinutes: health.sleepLastNightMinutes, restingHR: health.restingHeartRate)
+            Label(readiness.text, systemImage: readiness.good ? "bolt.heart.fill" : "tortoise.fill")
+                .font(.subheadline).foregroundStyle(readiness.good ? Color.green : Color.orange)
             HStack(spacing: 0) {
                 stat("\(health.stepsToday.formatted())", "steps")
                 stat(health.sleepLastNightMinutes.map { "\($0 / 60)h \($0 % 60)m" } ?? "—", "sleep")
@@ -109,12 +118,21 @@ struct TrainView: View {
 
     private var weekCard: some View {
         card {
-            Text("This week").font(.headline)
+            HStack {
+                Text("This week").font(.headline)
+                Spacer()
+                Button("Goals") { editingGoals = true }.font(.subheadline).buttonStyle(.glass).controlSize(.small)
+            }
             HStack(spacing: 0) {
-                stat("\(week.runs)", "runs")
-                stat(String(format: "%.1f", week.runKilometers), "km")
-                stat("\(week.lifts)", "lifts")
-                stat("\(week.minutes)", "min")
+                goalStat(week.runs, goalRuns, "runs")
+                VStack(spacing: 4) {
+                    Text(String(format: "%.1f", week.runKilometers)).font(.title3.weight(.semibold)).monospacedDigit().contentTransition(.numericText())
+                    Text("km").font(.caption).foregroundStyle(.secondary)
+                    Color.clear.frame(width: 44, height: 4)
+                }
+                .frame(maxWidth: .infinity)
+                goalStat(week.lifts, goalLifts, "lifts")
+                goalStat(week.minutes, goalMinutes, "min")
             }
             Divider()
             Text("Last 8 weeks · minutes").font(.subheadline).foregroundStyle(.secondary)
@@ -190,6 +208,31 @@ struct TrainView: View {
                 }
                 .buttonStyle(.glassProminent)
                 .disabled(weightDraft.isEmpty)
+            }
+        }
+    }
+
+    private func goalStat(_ value: Int, _ goal: Int, _ label: String) -> some View {
+        VStack(spacing: 4) {
+            Text("\(value)").font(.title3.weight(.semibold)).monospacedDigit().contentTransition(.numericText())
+                .foregroundStyle(goal > 0 && value >= goal ? Color.green : Color.primary)
+            Text(goal > 0 ? "\(label) / \(goal)" : label).font(.caption).foregroundStyle(.secondary)
+            if goal > 0 {
+                ProgressView(value: Double(min(value, goal)), total: Double(goal)).tint(value >= goal ? .green : AppSection.train.tint).frame(width: 44)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var bestsCard: some View {
+        let b = TrainingBests.make(health.workouts, calendar: calendar)
+        return card {
+            Text("Bests · 8 weeks").font(.headline)
+            HStack(spacing: 0) {
+                stat(b.fastest5kPace.map(WorkoutSummary.pace) ?? "—", "5 km pace")
+                stat(b.longestRunKm.map { String(format: "%.1f km", $0) } ?? "—", "longest run")
+                stat(b.longestSessionMinutes.map { "\($0) min" } ?? "—", "longest")
+                stat(b.biggestWeekMinutes.map { "\($0) min" } ?? "—", "best week")
             }
         }
     }
@@ -287,5 +330,26 @@ struct TrainView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
             .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+
+struct TrainGoalsForm: View {
+    @Binding var runs: Int
+    @Binding var lifts: Int
+    @Binding var minutes: Int
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Stepper("Runs per week: \(runs)", value: $runs, in: 0...14)
+                Stepper("Strength sessions per week: \(lifts)", value: $lifts, in: 0...14)
+                Stepper("Minutes per week: \(minutes)", value: $minutes, in: 0...2000, step: 30)
+            }
+            .navigationTitle("Weekly goals").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+        .presentationDetents([.medium])
     }
 }

@@ -100,12 +100,17 @@ final class FoodStore {
         var presets: [MealPreset]
         var targets: MacroTargets
         var recipes: [Recipe]?
+        var water: [String: Int]?
+        var waterTarget: Int?
     }
 
     private(set) var pantry: [PantryItem] = []
     private(set) var meals: [MealEntry] = []
     private(set) var presets: [MealPreset] = []
     private(set) var recipes: [Recipe] = []
+    /// Glasses per dayKey.
+    private(set) var water: [String: Int] = [:]
+    var waterTarget = 8 { didSet { save() } }
     var targets = MacroTargets(kcal: 2300, proteinGrams: 160) { didSet { save() } }
 
     private let fileURL: URL
@@ -120,6 +125,7 @@ final class FoodStore {
         self.calendar = calendar
         if case .loaded(let s) = JSONFile.load(Snapshot.self, from: fileURL) {
             pantry = s.pantry; meals = s.meals; presets = s.presets; targets = s.targets; recipes = s.recipes ?? []
+            water = s.water ?? [:]; waterTarget = s.waterTarget ?? 8
         }
     }
 
@@ -155,6 +161,24 @@ final class FoodStore {
             presets.append(MealPreset(name: name, kcal: kcal, proteinGrams: proteinGrams, carbsGrams: carbsGrams, fatGrams: fatGrams))
         }
         save()
+    }
+
+    // MARK: - Water
+
+    func water(on date: Date) -> Int { water[DayLogic.dayKey(date, calendar: calendar)] ?? 0 }
+
+    func logWater(_ glasses: Int, on date: Date = .now) {
+        let key = DayLogic.dayKey(date, calendar: calendar)
+        water[key] = max(0, (water[key] ?? 0) + glasses)
+        if water.count > 90 { for k in water.keys.sorted().prefix(water.count - 90) { water.removeValue(forKey: k) } }
+        save()
+    }
+
+    /// Averages over the last `days` days that have anything logged.
+    func averages(days: Int, now: Date) -> (kcal: Int, protein: Int, loggedDays: Int) {
+        let rows = kcalByDay(days: days, now: now).filter { $0.kcal > 0 }
+        guard !rows.isEmpty else { return (0, 0, 0) }
+        return (rows.map(\.kcal).reduce(0, +) / rows.count, rows.map(\.protein).reduce(0, +) / rows.count, rows.count)
     }
 
     // MARK: - Recipes
@@ -255,7 +279,9 @@ final class FoodStore {
     /// Section for the Coach snapshot: macros so far, quick-log presets, what's running low.
     func coachSummary(now: Date) -> String {
         let m = macros(on: now)
-        var lines = ["## Food today: \(m.kcal) / \(targets.kcal) kcal, \(m.proteinGrams) / \(targets.proteinGrams) g protein"]
+        var lines = ["## Food today: \(m.kcal) / \(targets.kcal) kcal, \(m.proteinGrams) / \(targets.proteinGrams) g protein, water \(water(on: now)) / \(waterTarget) glasses"]
+        let avg = averages(days: 7, now: now)
+        if avg.loggedDays > 1 { lines.append("7-day average: \(avg.kcal) kcal, \(avg.protein) g protein over \(avg.loggedDays) logged days") }
         let logged = meals(on: now)
         if !logged.isEmpty {
             lines.append("Logged: " + logged.map { "\($0.name) (\($0.kcal) kcal, \($0.proteinGrams) g)" }.joined(separator: "; "))
@@ -279,7 +305,7 @@ final class FoodStore {
     // MARK: - Persistence
 
     private func save() {
-        JSONFile.save(Snapshot(pantry: pantry, meals: meals, presets: presets, targets: targets, recipes: recipes), to: fileURL)
+        JSONFile.save(Snapshot(pantry: pantry, meals: meals, presets: presets, targets: targets, recipes: recipes, water: water, waterTarget: waterTarget), to: fileURL)
     }
 
     // MARK: - Sample data (tests and previews)

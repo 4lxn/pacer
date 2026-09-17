@@ -98,3 +98,34 @@ final class TrainDepthTests: XCTestCase {
         XCTAssertNil(WeightStats.weeklyChange([], now: date(16), calendar: calendar))
     }
 }
+
+final class BestsAndReadinessTests: XCTestCase {
+    func testBestsAndReadiness() {
+        var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "America/Mexico_City")!
+        func run(_ day: Int, min: Double, km: Double) -> WorkoutSummary {
+            let s = c.date(from: DateComponents(year: 2026, month: 9, day: day, hour: 7))!
+            return WorkoutSummary(id: UUID(), activity: .run, start: s, end: s.addingTimeInterval(min * 60), distanceMeters: km * 1000, kcal: nil, source: "")
+        }
+        let b = TrainingBests.make([run(1, min: 30, km: 6), run(3, min: 26, km: 5), run(10, min: 20, km: 4.5)], calendar: c)
+        XCTAssertEqual(b.fastest5kPace!, 5.0, accuracy: 0.01)   // the 4.5 km run doesn't count
+        XCTAssertEqual(b.longestRunKm, 6)
+        XCTAssertEqual(b.longestSessionMinutes, 30)
+        XCTAssertEqual(b.biggestWeekMinutes, 56)
+        XCTAssertFalse(Readiness.line(sleepMinutes: 5 * 60 + 20, restingHR: 54).good)
+        XCTAssertTrue(Readiness.line(sleepMinutes: 7 * 60 + 10, restingHR: 54).good)
+        XCTAssertFalse(Readiness.line(sleepMinutes: nil, restingHR: 62, typicalRestingHR: 54).good)
+        XCTAssertEqual(Readiness.line(sleepMinutes: nil, restingHR: nil).text, "No sleep or heart data yet.")
+    }
+}
+
+final class DayStreakTests: XCTestCase {
+    func testStreakCountsBackFromTodayOrYesterday() {
+        var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "America/Mexico_City")!
+        let now = c.date(from: DateComponents(year: 2026, month: 9, day: 16, hour: 20))!
+        let scores: [Int: Double] = [16: 0.5, 15: 0.9, 14: 1.0, 13: 0.85, 12: 0.2, 11: 1.0]
+        func score(_ d: Date) -> Double? { scores[c.component(.day, from: d)] }
+        XCTAssertEqual(DayLogic.dayStreak(now: now, calendar: c, score: score), 3)      // today not there yet → 15, 14, 13
+        XCTAssertEqual(DayLogic.dayStreak(now: now, calendar: c, score: { d in c.component(.day, from: d) == 16 ? 0.9 : score(d) }), 4)
+        XCTAssertEqual(DayLogic.dayStreak(now: now, calendar: c, score: { _ in 0.1 }), 0)
+    }
+}

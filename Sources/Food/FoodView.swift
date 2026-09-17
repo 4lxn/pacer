@@ -5,6 +5,7 @@ import SwiftUI
 struct FoodView: View {
     @Bindable var food: FoodStore
     @Bindable var account: CoachAccount
+    @Bindable var agent: CoachAgent
     @State private var now = Date.now
     @State private var addingMeal = false
     @State private var estimating = false
@@ -43,7 +44,7 @@ struct FoodView: View {
             .sheet(isPresented: $estimating) { MealEstimateSheet(account: account) { food.log(name: $0.name, kcal: $0.kcal, proteinGrams: $0.proteinGrams, carbsGrams: $0.carbsGrams, fatGrams: $0.fatGrams, saveAsPreset: $0.keep) } }
             .sheet(isPresented: $addingItem) { PantryForm(item: PantryItem(name: "", quantity: 1, unit: "pcs", minQuantity: 1)) { food.upsert($0) } }
             .sheet(item: $editingItem) { item in PantryForm(item: item) { food.upsert($0) } }
-            .sheet(isPresented: $editingTargets) { TargetsForm(targets: food.targets) { food.targets = $0 } }
+            .sheet(isPresented: $editingTargets) { TargetsForm(targets: food.targets, water: food.waterTarget) { food.targets = $0 } onWater: { food.waterTarget = $0 } }
             .sheet(isPresented: $addingRecipe) { RecipeForm(recipe: Recipe(name: "", ingredients: [], kcal: 0, proteinGrams: 0), pantry: food.pantry) { food.upsertRecipe($0) } }
             .sheet(item: $editingRecipe) { r in RecipeForm(recipe: r, pantry: food.pantry) { food.upsertRecipe($0) } }
             .onAppear { now = .now }
@@ -59,11 +60,48 @@ struct FoodView: View {
             macroRow("Protein", m.proteinGrams, food.targets.proteinGrams, "g")
             if food.targets.carbsGrams > 0 { macroRow("Carbs", m.carbsGrams, food.targets.carbsGrams, "g") }
             if food.targets.fatGrams > 0 { macroRow("Fat", m.fatGrams, food.targets.fatGrams, "g") }
+            waterRow
+            Button {
+                let m = food.macros(on: now)
+                agent.queued = "Plan my meals for the rest of today. I have \(max(0, food.targets.kcal - m.kcal)) kcal and \(max(0, food.targets.proteinGrams - m.proteinGrams)) g protein left. Use my pantry, recipes and quick-log presets, and my food rules; list each meal with a time and macros. Don't log anything yet."
+            } label: {
+                Label("Plan my meals with the Coach", systemImage: "sparkles")
+            }
             weekChart
         } header: { Text("Today") } footer: {
             let left = food.targets.kcal - food.macros(on: now).kcal
-            Text(left > 0 ? "\(left) kcal left · \(max(0, food.targets.proteinGrams - food.macros(on: now).proteinGrams)) g protein to go" : "Calories for today are in.")
+            let avg = food.averages(days: 7, now: now)
+            Text((left > 0 ? "\(left) kcal left · \(max(0, food.targets.proteinGrams - food.macros(on: now).proteinGrams)) g protein to go" : "Calories for today are in.")
+                 + (avg.loggedDays > 1 ? "\n7-day average: \(avg.kcal) kcal · \(avg.protein) g protein" : ""))
         }
+    }
+
+    /// Tap a drop to fill it (and everything before it); tap the last filled one to undo.
+    private var waterRow: some View {
+        let glasses = food.water(on: now), target = max(food.waterTarget, 1)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Water")
+                Spacer()
+                Text("\(glasses) / \(target) glasses").monospacedDigit().foregroundStyle(.secondary).contentTransition(.numericText())
+            }
+            HStack(spacing: 6) {
+                ForEach(1...max(target, glasses), id: \.self) { i in
+                    Button {
+                        food.logWater(i <= glasses ? (i == glasses ? -1 : i - glasses) : i - glasses, on: now)
+                    } label: {
+                        Image(systemName: i <= glasses ? "drop.fill" : "drop")
+                            .font(.title3)
+                            .foregroundStyle(i <= glasses ? Color.cyan : Color(uiColor: .tertiaryLabel))
+                            .frame(maxWidth: .infinity)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .sensoryFeedback(.increase, trigger: glasses)
+        }
+        .animation(.snappy, value: glasses)
     }
 
     private func macroRow(_ label: String, _ value: Int, _ target: Int, _ unit: String) -> some View {
@@ -492,7 +530,9 @@ struct PantryForm: View {
 
 struct TargetsForm: View {
     @State var targets: MacroTargets
+    @State var water: Int = 8
     let onSave: (MacroTargets) -> Void
+    var onWater: ((Int) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -502,11 +542,12 @@ struct TargetsForm: View {
                 Stepper("Protein: \(targets.proteinGrams) g", value: $targets.proteinGrams, in: 50...300, step: 5)
                 Stepper(targets.carbsGrams == 0 ? "Carbs: not tracked" : "Carbs: \(targets.carbsGrams) g", value: $targets.carbsGrams, in: 0...600, step: 10)
                 Stepper(targets.fatGrams == 0 ? "Fat: not tracked" : "Fat: \(targets.fatGrams) g", value: $targets.fatGrams, in: 0...300, step: 5)
+                Stepper("Water: \(water) glasses", value: $water, in: 2...20)
             }
             .navigationTitle("Daily targets").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { onSave(targets); dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { onSave(targets); onWater?(water); dismiss() } }
             }
         }
     }
