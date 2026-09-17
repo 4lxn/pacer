@@ -82,3 +82,15 @@ final class CoachClientTests: XCTestCase {
         XCTAssertTrue(snapshot.contains("anytime One thing for the future — not done yet"))
     }
 }
+
+@MainActor
+final class CoachProfileComposeTests: XCTestCase {
+    func testComposeFillsSectionsAndKeepsPlaceholdersForBlanks() {
+        let text = CoachProfile.compose(answers: ["goals": "  Lose 5 kg by December ", "food": ""])
+        XCTAssertTrue(text.contains("## Goals\nLose 5 kg by December"))
+        XCTAssertTrue(text.contains("## Food\n(targets, foods I actually eat, rules)"))
+        XCTAssertTrue(text.hasPrefix("You are my coach."))
+        XCTAssertEqual(CoachProfile.questions.count, 5)
+        XCTAssertEqual(Set(CoachProfile.questions.map(\.id)).count, 5)
+    }
+}
