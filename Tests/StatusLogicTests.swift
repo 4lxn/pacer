@@ -19,6 +19,13 @@ final class StatusLogicTests: XCTestCase {
         XCTAssertEqual(block.status(now: date(2026, 9, 16, 12, 0), completed: ["x"], calendar: calendar), .done)
     }
 
+    func testSkippedWinsOverEverythingButDone() {
+        XCTAssertEqual(block.status(now: date(2026, 9, 16, 10, 15), completed: [], skipped: ["x"], calendar: calendar), .skipped)
+        XCTAssertEqual(block.status(now: date(2026, 9, 16, 12, 0), completed: ["x"], skipped: ["x"], calendar: calendar), .done)
+        XCTAssertNil(DayLogic.currentBlock([block], now: date(2026, 9, 16, 12, 0), completed: [], skipped: ["x"], calendar: calendar))
+        XCTAssertEqual(DayLogic.clock(.hm(7, 5)), "07:05")
+    }
+
     func testFree() {
         XCTAssertEqual(free.status(now: date(2026, 9, 16, 12, 0), completed: [], calendar: calendar), .free)
         XCTAssertEqual(free.status(now: date(2026, 9, 16, 12, 0), completed: ["f"], calendar: calendar), .done)
@@ -98,7 +105,9 @@ final class StatusLogicTests: XCTestCase {
         XCTAssertFalse(sunday.contains("b16"))
         XCTAssertTrue(sunday.contains("b14"))
         let gym = Plan.blocks.first { $0.id == "b16" }!
-        XCTAssertEqual(gym.note(on: date(2026, 9, 16, 12, 0), calendar: calendar), "Upper 2")
+        XCTAssertEqual(gym.note(on: date(2026, 9, 16, 12, 0), calendar: calendar), "Upper")
         XCTAssertNil(gym.note(on: date(2026, 9, 20, 12, 0), calendar: calendar))
+        // Check-in defaults: windows ≥ 20 min on, fixed off, anchor never.
+        XCTAssertEqual(Plan.blocks.filter(\.checkIn).map(\.id), ["b03", "b04", "b05", "b09", "b14", "b16", "b17"])
     }
 }

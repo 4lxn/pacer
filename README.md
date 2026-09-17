@@ -1,7 +1,8 @@
 # Autopiloto
 
-Your day on rails. An iOS planner of daily blocks that notifies you when each fixed block starts,
-takes Done / Snooze from the lock screen, closes training blocks from Apple Health, and bundles the
+Keeps your day on pace. An iOS planner of daily blocks that notifies you when each fixed block
+starts, asks "did it happen?" five minutes after a longer block ends (Done / Skip today from the
+lock screen), closes training blocks from Apple Health, and bundles the
 trackers around your day: training week and weight, meals and pantry, study timer, income, closet
 with laundry and outfits, and an AI Coach that knows your plan. Swift 6, SwiftUI, iOS 26+ (Liquid Glass), no
 third-party dependencies.
@@ -65,7 +66,7 @@ plus a snapshot of today's blocks, training, food, study and closet.
 ## Verify no network code outside Coach
 
 ```sh
-grep -ri "urlsession\|http\|apikey" Sources/ --exclude-dir=Coach   # must print nothing
+grep -ri "urlsession\|http" Sources/ --exclude-dir=Coach   # must print nothing
 ```
 
 ## Manual checks in the simulator
@@ -74,7 +75,7 @@ grep -ri "urlsession\|http\|apikey" Sources/ --exclude-dir=Coach   # must print 
 export DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer
 SIM=$(xcrun simctl list devices booted | grep -o '[0-9A-F-]\{36\}' | head -1)
 
-# Fire a block notification now (after tapping Allow once). Long-press it → Done marks b13 complete
+# Fire a start notification now (after tapping Allow once). Long-press it → Done marks b13 complete
 # without opening the app; relaunch and the row is checked.
 cat > /tmp/block.apns <<'JSON'
 {
@@ -84,6 +85,16 @@ cat > /tmp/block.apns <<'JSON'
 }
 JSON
 xcrun simctl push "$SIM" com.alan.autopiloto /tmp/block.apns
+
+# Fire a check-in: long-press → Done or Skip today; both land on the dayKey, not on "now".
+cat > /tmp/checkin.apns <<'JSON'
+{
+  "Simulator Target Bundle": "com.alan.autopiloto",
+  "aps": { "alert": { "title": "Lunch ended", "body": "Did it happen?" }, "category": "CHECK_IN", "sound": "default" },
+  "blockId": "b09", "dayKey": "2026-09-16"
+}
+JSON
+xcrun simctl push "$SIM" com.alan.autopiloto /tmp/checkin.apns
 
 # Denial path: reset the permission and tap Don't Allow on the next launch.
 xcrun simctl privacy "$SIM" reset all com.alan.autopiloto

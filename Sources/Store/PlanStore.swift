@@ -1,9 +1,7 @@
 import Foundation
 import Observation
 
-/// The user's blocks, persisted as JSON in Application Support. Installs that predate the editor
-/// (they already have a completions file) are seeded with the original hard-coded day; fresh
-/// installs get onboarding.
+/// The user's blocks, persisted as JSON in Application Support. No plan file → onboarding.
 @Observable
 @MainActor
 final class PlanStore {
@@ -16,16 +14,11 @@ final class PlanStore {
             .appendingPathComponent("plan.json")
     }
 
-    init(fileURL: URL = PlanStore.defaultURL, legacyMarker: URL = CompletionStore.defaultURL) {
+    init(fileURL: URL = PlanStore.defaultURL) {
         self.fileURL = fileURL
-        if let data = try? Data(contentsOf: fileURL),
-           let decoded = try? JSONDecoder().decode([Block].self, from: data) {
-            blocks = decoded
-        } else if FileManager.default.fileExists(atPath: legacyMarker.path) {
-            blocks = Plan.blocks
-            save()
-        } else {
-            needsOnboarding = true
+        switch JSONFile.load([Block].self, from: fileURL) {
+        case .loaded(let decoded): blocks = decoded
+        case .missing, .corrupt: needsOnboarding = true
         }
     }
 
@@ -81,12 +74,5 @@ final class PlanStore {
         return result
     }
 
-    private func save() {
-        do {
-            try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try JSONEncoder().encode(blocks).write(to: fileURL, options: .atomic)
-        } catch {
-            assertionFailure("PlanStore save failed: \(error)")
-        }
-    }
+    private func save() { JSONFile.save(blocks, to: fileURL) }
 }

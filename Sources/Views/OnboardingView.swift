@@ -22,7 +22,7 @@ struct OnboardingView: View {
                     .buttonStyle(.glassProminent).controlSize(.large).frame(maxWidth: .infinity)
             } else {
                 Text("Let it tap you on the shoulder").font(.largeTitle.weight(.bold))
-                Text("Each fixed block sends a notification when it starts. Done and Snooze work from the lock screen.")
+                Text("Each fixed block sends a notification when it starts, and longer blocks ask \"did it happen?\" when they end. Press and hold a notification to see Done, Snooze or Skip — no need to open the app.")
                     .foregroundStyle(.secondary)
                 Button("Allow notifications") {
                     Task {

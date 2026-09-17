@@ -56,7 +56,8 @@ partners: no" — it is our processor, not a partner collecting for its own purp
 Autopiloto is a personal planner. Reviewers can use it fully without an account:
 
 1. Onboarding asks for wake and sleep times and builds a plan. Allow notifications to see block
-   alerts; each fixed block schedules a repeating local notification with Done / Snooze actions.
+   alerts; each fixed block schedules a repeating local notification with Done / Snooze actions,
+   and longer window blocks get a one-shot "did it happen?" check-in with Done / Skip today.
 2. The Train tab reads Apple Health workouts, weight and steps (HealthKit permission). Blocks marked
    "auto-complete: run / strength" complete when a matching workout exists today.
 3. The Coach tab requires either a subscription (Sign in with Apple, then "Coach monthly") or the

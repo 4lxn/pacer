@@ -16,6 +16,10 @@ struct Block: Codable, Identifiable, Hashable, Sendable {
     var weekdays: Set<Int>?      // Calendar weekday (1 = Sunday … 7 = Saturday); nil = every day
     var autoComplete: WorkoutMatch?   // a matching Apple Health workout today marks this block done
     var weekdayNotes: [Int: String]?  // optional per-weekday subtitle, e.g. the gym session of the day
+    /// A check-in notification fires 5 min after `end` unless the block is done or skipped.
+    /// Default: on for window blocks of 20 min or more, off for fixed blocks (their start
+    /// notification already covers them) and never for the anchor.
+    var checkIn: Bool = false
 
     init(
         id: String,
@@ -26,7 +30,8 @@ struct Block: Codable, Identifiable, Hashable, Sendable {
         isAnchor: Bool = false,
         weekdays: Set<Int>? = nil,
         autoComplete: WorkoutMatch? = nil,
-        weekdayNotes: [Int: String]? = nil
+        weekdayNotes: [Int: String]? = nil,
+        checkIn: Bool? = nil
     ) {
         self.id = id
         self.label = label
@@ -37,6 +42,36 @@ struct Block: Codable, Identifiable, Hashable, Sendable {
         self.weekdays = weekdays
         self.autoComplete = autoComplete
         self.weekdayNotes = weekdayNotes
+        self.checkIn = checkIn ?? Block.defaultCheckIn(kind: kind, start: start, end: end, isAnchor: isAnchor)
+    }
+
+    static func defaultCheckIn(kind: BlockKind, start: DateComponents?, end: DateComponents?, isAnchor: Bool) -> Bool {
+        guard kind == .window, !isAnchor, let s = start, let e = end else { return false }
+        let minutes = ((e.hour ?? 0) * 60 + (e.minute ?? 0)) - ((s.hour ?? 0) * 60 + (s.minute ?? 0))
+        return minutes >= 20
+    }
+
+    var durationMinutes: Int? {
+        guard let s = start, let e = end else { return nil }
+        return ((e.hour ?? 0) * 60 + (e.minute ?? 0)) - ((s.hour ?? 0) * 60 + (s.minute ?? 0))
+    }
+
+    // Older plan.json files have no `checkIn`; decode it as its default.
+    private enum CodingKeys: String, CodingKey { case id, label, kind, start, end, isAnchor, weekdays, autoComplete, weekdayNotes, checkIn }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        label = try c.decode(String.self, forKey: .label)
+        kind = try c.decode(BlockKind.self, forKey: .kind)
+        start = try c.decodeIfPresent(DateComponents.self, forKey: .start)
+        end = try c.decodeIfPresent(DateComponents.self, forKey: .end)
+        isAnchor = try c.decode(Bool.self, forKey: .isAnchor)
+        weekdays = try c.decodeIfPresent(Set<Int>.self, forKey: .weekdays)
+        autoComplete = try c.decodeIfPresent(WorkoutMatch.self, forKey: .autoComplete)
+        weekdayNotes = try c.decodeIfPresent([Int: String].self, forKey: .weekdayNotes)
+        checkIn = try c.decodeIfPresent(Bool.self, forKey: .checkIn)
+            ?? Block.defaultCheckIn(kind: kind, start: start, end: end, isAnchor: isAnchor)
     }
 
     func note(on day: Date, calendar: Calendar) -> String? {

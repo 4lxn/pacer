@@ -60,17 +60,11 @@ final class FoodStore {
             .appendingPathComponent("food.json")
     }
 
-    init(fileURL: URL = FoodStore.defaultURL, legacyMarker: URL = CompletionStore.defaultURL, calendar: Calendar = .current) {
+    init(fileURL: URL = FoodStore.defaultURL, calendar: Calendar = .current) {
         self.fileURL = fileURL
         self.calendar = calendar
-        if let data = try? Data(contentsOf: fileURL),
-           let s = try? JSONDecoder().decode(Snapshot.self, from: data) {
+        if case .loaded(let s) = JSONFile.load(Snapshot.self, from: fileURL) {
             pantry = s.pantry; meals = s.meals; presets = s.presets; targets = s.targets
-        } else if FileManager.default.fileExists(atPath: legacyMarker.path) {
-            // Pre-editor install: seed the original user's staples and template meals.
-            pantry = Self.seedPantry
-            presets = Self.seedPresets
-            save()
         }
     }
 
@@ -165,16 +159,10 @@ final class FoodStore {
     // MARK: - Persistence
 
     private func save() {
-        do {
-            try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let s = Snapshot(pantry: pantry, meals: meals, presets: presets, targets: targets)
-            try JSONEncoder().encode(s).write(to: fileURL, options: .atomic)
-        } catch {
-            assertionFailure("FoodStore save failed: \(error)")
-        }
+        JSONFile.save(Snapshot(pantry: pantry, meals: meals, presets: presets, targets: targets), to: fileURL)
     }
 
-    // MARK: - Seeds (original user's staples)
+    // MARK: - Sample data (tests and previews)
 
     static let seedPantry: [PantryItem] = [
         PantryItem(name: "Ground beef 95/5", quantity: 1000, unit: "g", minQuantity: 750),

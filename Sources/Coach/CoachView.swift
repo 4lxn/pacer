@@ -161,9 +161,11 @@ struct CoachView: View {
                     .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 18)).foregroundStyle(.white)
             }
         case .assistant:
-            HStack { Text(entry.text).padding(12).textSelection(.enabled)
+            HStack(alignment: .top) {
+                MarkdownText(text: entry.text).padding(12).textSelection(.enabled)
                     .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
-                Spacer(minLength: 40) }
+                Spacer(minLength: 32)
+            }
         case .tool:
             Label(entry.text, systemImage: "checkmark.circle.fill")
                 .font(.caption.weight(.medium))

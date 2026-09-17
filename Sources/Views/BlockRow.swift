@@ -5,11 +5,13 @@ struct BlockRow: View {
     let status: BlockStatus
     let subtitle: String?
     let onToggle: () -> Void
+    var onSkip: (() -> Void)? = nil
+    var onUnskip: (() -> Void)? = nil
 
     var body: some View {
         Button(action: onToggle) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Image(systemName: status == .done ? "checkmark.circle.fill" : "circle")
+                Image(systemName: status == .done ? "checkmark.circle.fill" : status == .skipped ? "minus.circle" : "circle")
                     .font(.title3)
                     .foregroundStyle(status == .done ? Color.accentColor : .secondary)
                 Text(timeText)
@@ -19,7 +21,7 @@ struct BlockRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(block.label)
-                            .strikethrough(status == .done)
+                            .strikethrough(status == .done || status == .skipped)
                             .fontWeight(status == .current ? .semibold : .regular)
                         if block.isAnchor {
                             Image(systemName: "anchor").font(.caption).foregroundStyle(.secondary)
@@ -35,11 +37,18 @@ struct BlockRow: View {
             }
             .padding(.vertical, 10)
             .padding(.horizontal, 12)
-            .foregroundStyle(status == .done ? .secondary : .primary)
-            .opacity(status == .done ? 0.6 : 1)
+            .foregroundStyle(status == .done || status == .skipped ? .secondary : .primary)
+            .opacity(status == .done || status == .skipped ? 0.6 : 1)
             .background(rowBackground)
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if status == .skipped, let onUnskip {
+                Button("Back on today's plan", systemImage: "arrow.uturn.backward") { onUnskip() }
+            } else if status != .done, let onSkip {
+                Button("Skip today", systemImage: "minus.circle") { onSkip() }
+            }
+        }
         .accessibilityValue(accessibilityStatus)
     }
 
@@ -49,7 +58,7 @@ struct BlockRow: View {
     }
 
     private var kindChip: some View {
-        Text(block.kind.rawValue)
+        Text(status == .skipped ? "skipped" : block.kind.rawValue)
             .font(.caption2.weight(.medium))
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
@@ -69,6 +78,7 @@ struct BlockRow: View {
     private var accessibilityStatus: String {
         switch status {
         case .done: "done"
+        case .skipped: "skipped today"
         case .current: "current"
         case .upcoming: "upcoming"
         case .missed: "missed"

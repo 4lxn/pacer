@@ -36,6 +36,28 @@ final class CompletionStoreTests: XCTestCase {
         XCTAssertEqual(store.completed(on: date(17, 0)), [])
     }
 
+    func testSkipAndUnskipAndDayKeyAPI() {
+        let store = CompletionStore(fileURL: url, calendar: calendar)
+        store.skip("b09", on: date(16, 13))
+        XCTAssertEqual(store.skipped(on: date(16, 20)), ["b09"])
+        store.markDone("b09", dayKey: "2026-09-16")        // done clears skipped
+        XCTAssertEqual(store.skipped(dayKey: "2026-09-16"), [])
+        XCTAssertEqual(store.completed(dayKey: "2026-09-16"), ["b09"])
+        store.skip("b09", dayKey: "2026-09-16")             // skip clears done
+        XCTAssertEqual(store.completed(on: date(16, 20)), [])
+        store.unskip("b09", on: date(16, 20))
+        XCTAssertEqual(store.skipped(on: date(16, 20)), [])
+        XCTAssertEqual(CompletionStore(fileURL: url, calendar: calendar).days["2026-09-16"], CompletionStore.Day())
+    }
+
+    func testReadsThePreSkipFileShape() throws {
+        try Data(#"{"2026-09-16":["b01","b02"]}"#.utf8).write(to: url)
+        let store = CompletionStore(fileURL: url, calendar: calendar)
+        XCTAssertEqual(store.completed(on: date(16, 9)), ["b01", "b02"])
+        XCTAssertNil(PersistenceState.shared.lastError)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.appendingPathExtension("bad").path))
+    }
+
     func testToggle() {
         let store = CompletionStore(fileURL: url, calendar: calendar)
         store.toggle("b02", on: date(16, 9))

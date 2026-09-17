@@ -35,7 +35,7 @@ final class WardrobeStore {
         self.fileURL = fileURL
         self.imagesDirectory = fileURL.deletingLastPathComponent().appendingPathComponent("wardrobe", isDirectory: true)
         self.calendar = calendar
-        if let data = try? Data(contentsOf: fileURL), let s = try? JSONDecoder().decode(Snapshot.self, from: data) {
+        if case .loaded(let s) = JSONFile.load(Snapshot.self, from: fileURL) {
             closet = s.closet; outfits = s.outfits; weather = s.weather; formality = s.formality
         }
     }
@@ -120,12 +120,6 @@ final class WardrobeStore {
     }
 
     private func save() {
-        do {
-            try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let s = Snapshot(closet: closet, outfits: outfits, weather: weather, formality: formality)
-            try JSONEncoder().encode(s).write(to: fileURL, options: .atomic)
-        } catch {
-            assertionFailure("WardrobeStore save failed: \(error)")
-        }
+        JSONFile.save(Snapshot(closet: closet, outfits: outfits, weather: weather, formality: formality), to: fileURL)
     }
 }

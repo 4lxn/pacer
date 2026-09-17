@@ -92,7 +92,7 @@ final class CoachChatStore {
             let data = try JSONSerialization.data(withJSONObject: ["messages": messages, "toolSummaries": toolSummaries])
             try data.write(to: fileURL, options: .atomic)
         } catch {
-            assertionFailure("CoachChatStore save failed: \(error)")
+            PersistenceState.shared.report("Couldn't save chat.json")
         }
     }
 

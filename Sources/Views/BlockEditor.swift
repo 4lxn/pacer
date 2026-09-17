@@ -41,6 +41,9 @@ struct BlockEditor: View {
                     }
                 }
                 Section {
+                    if block.kind != .free && !block.isAnchor {
+                        Toggle("Check-in 5 min after it ends", isOn: $block.checkIn)
+                    }
                     Toggle("Anchor (never droppable, breaks through Focus)", isOn: $block.isAnchor)
                     Picker("Auto-complete", selection: autoBinding) {
                         Text("Off").tag("")
@@ -74,7 +77,9 @@ struct BlockEditor: View {
             }
             .onChange(of: block.kind) { _, kind in
                 if kind != .free, block.start == nil { block.start = .hm(12, 0); block.end = .hm(12, 30) }
+                if kind == .free || block.isAnchor { block.checkIn = false }
             }
+            .onChange(of: block.isAnchor) { _, anchor in if anchor { block.checkIn = false } }
         }
     }
 

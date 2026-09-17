@@ -2,6 +2,7 @@ import Foundation
 
 enum BlockStatus: Equatable {
     case done
+    case skipped      // the user chose to skip it today
     case current      // now within [start, end]
     case upcoming     // now < start
     case missed       // now > end and not done
@@ -9,8 +10,9 @@ enum BlockStatus: Equatable {
 }
 
 extension Block {
-    func status(now: Date, completed: Set<String>, calendar: Calendar = .current) -> BlockStatus {
+    func status(now: Date, completed: Set<String>, skipped: Set<String> = [], calendar: Calendar = .current) -> BlockStatus {
         if completed.contains(id) { return .done }
+        if skipped.contains(id) { return .skipped }
         if kind == .free { return .free }
         guard let start = startDate(on: now, calendar: calendar),
               let end = endDate(on: now, calendar: calendar) else { return .free }
@@ -37,16 +39,20 @@ enum DayLogic {
     }
 
     /// First `.current` block in start order; if none, the first `.missed` one.
-    static func currentBlock(_ blocks: [Block], now: Date, completed: Set<String>, calendar: Calendar = .current) -> Block? {
+    static func currentBlock(_ blocks: [Block], now: Date, completed: Set<String>, skipped: Set<String> = [], calendar: Calendar = .current) -> Block? {
         let ordered = sorted(blocks)
-        if let current = ordered.first(where: { $0.status(now: now, completed: completed, calendar: calendar) == .current }) {
+        if let current = ordered.first(where: { $0.status(now: now, completed: completed, skipped: skipped, calendar: calendar) == .current }) {
             return current
         }
-        return ordered.first { $0.status(now: now, completed: completed, calendar: calendar) == .missed }
+        return ordered.first { $0.status(now: now, completed: completed, skipped: skipped, calendar: calendar) == .missed }
     }
 
-    static func nextUp(_ blocks: [Block], now: Date, completed: Set<String>, calendar: Calendar = .current) -> Block? {
-        sorted(blocks).first { $0.status(now: now, completed: completed, calendar: calendar) == .upcoming }
+    static func nextUp(_ blocks: [Block], now: Date, completed: Set<String>, skipped: Set<String> = [], calendar: Calendar = .current) -> Block? {
+        sorted(blocks).first { $0.status(now: now, completed: completed, skipped: skipped, calendar: calendar) == .upcoming }
+    }
+
+    static func clock(_ c: DateComponents) -> String {
+        String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0)
     }
 
     /// `yyyy-MM-dd` in the calendar's time zone; the key completion is stored under.
