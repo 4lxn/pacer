@@ -10,6 +10,7 @@ struct CoachView: View {
     @Bindable var account: CoachAccount
     @Bindable var wardrobe: WardrobeStore
     @Bindable var agent: CoachAgent
+    @Bindable var sections: SectionStore
 
     @State private var apiKey: String = APIKeyStore.load() ?? ""
     @State private var useOwnKey = CoachAccount.screenshotMode == nil && (CoachClient.proxyURL == nil || APIKeyStore.load() != nil)
@@ -233,7 +234,11 @@ struct CoachView: View {
         let blocks = DayLogic.sorted(mutator.effectivePlan(on: now))   // today's overrides included
         let snapshot = CoachContext.snapshot(
             blocks: blocks, now: now, completed: store.completed(on: now), calendar: calendar,
-            extra: [mutator.days.places.coachSummary(), health.coachSummary(now: now, calendar: calendar), food.coachSummary(now: now), track.coachSummary(now: now), wardrobe.coachSummary()]
+            extra: [mutator.days.places.coachSummary()]
+                + (sections.isOn(.train) ? [health.coachSummary(now: now, calendar: calendar)] : [])
+                + (sections.isOn(.food) ? [food.coachSummary(now: now)] : [])
+                + (sections.isOn(.focus) || sections.isOn(.money) ? [track.coachSummary(now: now)] : [])
+                + (sections.isOn(.closet) ? [wardrobe.coachSummary()] : [])
         )
         return [
             ["type": "text", "text": CoachProfile.load() + CoachContext.agentRules, "cache_control": ["type": "ephemeral"]],

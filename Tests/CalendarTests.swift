@@ -72,3 +72,24 @@ final class CalendarTests: XCTestCase {
         XCTAssertTrue(mutator.days.override(dayKey: "2026-09-17").isEmpty)
     }
 }
+
+@MainActor
+final class SectionStoreTests: XCTestCase {
+    func testEnableDisableReorderAndToolFilter() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).json")
+        let s = SectionStore(fileURL: url)
+        XCTAssertEqual(s.enabled, SectionStore.defaultEnabled)
+        s.set(.closet, on: false); s.set(.money, on: false)
+        XCTAssertFalse(s.allowsTool("add_garment")); XCTAssertFalse(s.allowsTool("get_income"))
+        XCTAssertTrue(s.allowsTool("get_plan")); XCTAssertTrue(s.allowsTool("log_meal"))
+        s.set(.today, on: false)                       // core: ignored
+        XCTAssertTrue(s.isOn(.today))
+        s.move(from: IndexSet(integer: 0), to: 3)      // Today snaps back to first
+        XCTAssertEqual(s.enabled.first, .today)
+        s.set(.money, on: true)                        // enabled in its canonical slot
+        XCTAssertEqual(s.enabled, [.today, .train, .food, .focus, .money, .coach])
+        XCTAssertEqual(SectionStore(fileURL: url).enabled, s.enabled)
+        s.replace([.coach, .food])
+        XCTAssertEqual(s.enabled, [.today, .coach, .food])
+    }
+}

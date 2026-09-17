@@ -11,7 +11,7 @@ struct AutopilotoApp: App {
         WindowGroup {
             RootView(store: appDelegate.store, plan: appDelegate.plan, days: appDelegate.days, mutator: appDelegate.mutator,
                      metrics: appDelegate.metrics, health: appDelegate.health, food: appDelegate.food, track: appDelegate.track,
-                     account: appDelegate.account, wardrobe: appDelegate.wardrobe, agent: appDelegate.agent)
+                     account: appDelegate.account, wardrobe: appDelegate.wardrobe, agent: appDelegate.agent, sections: appDelegate.sections)
         }
     }
 }
@@ -31,10 +31,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     let wardrobe = WardrobeStore()
     let days = DayStore()
     let metrics = MetricsStore()
+    let sections = SectionStore()
     lazy var mutator = DayMutator(plan: plan, completions: store, days: days, metrics: metrics)
     lazy var agent = CoachAgent(
         chat: CoachChatStore(),
-        tools: CoachTools(plan: plan, completions: store, food: food, wardrobe: wardrobe, health: health, track: track, mutator: mutator)
+        tools: CoachTools(plan: plan, completions: store, food: food, wardrobe: wardrobe, health: health, track: track, mutator: mutator, sections: sections)
     )
     private(set) lazy var notificationDelegate = NotificationDelegate(mutator: mutator)
 

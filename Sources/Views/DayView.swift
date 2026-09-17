@@ -10,6 +10,7 @@ struct DayView: View {
     @Bindable var health: HealthStore
     @Bindable var track: TrackStore
     @Bindable var account: CoachAccount
+    @Bindable var sections: SectionStore
     @Environment(\.scenePhase) private var scenePhase
     @State private var now = Date.now
     @State private var notificationsDenied = false
@@ -126,7 +127,7 @@ struct DayView: View {
             if CoachAccount.screenshotMode == "tomorrow" { openDay = calendar.date(byAdding: .day, value: 1, to: now) }
             #endif
         }
-        .sheet(isPresented: $showingSettings) { SettingsView(days: days, metrics: metrics, health: health, account: account, plan: plan) }
+        .sheet(isPresented: $showingSettings) { SettingsView(days: days, metrics: metrics, health: health, account: account, plan: plan, sections: sections) }
         .onChange(of: track.sessions) { _, _ in Task { await autoCompleteFromHealth() } }
         .task(id: plan.needsOnboarding) {
             // Onboarding asks for the permission itself; don't double-prompt behind the cover.

@@ -31,7 +31,7 @@ final class CoachAgent {
         for _ in 0..<Self.maxIterations {
             let request: URLRequest
             do {
-                request = try CoachClient.makeAgentRequest(auth: client.auth, model: client.model, system: systemBlocks, messages: chat.messages, tools: CoachTools.definitions)
+                request = try CoachClient.makeAgentRequest(auth: client.auth, model: client.model, system: systemBlocks, messages: chat.messages, tools: tools.enabledDefinitions)
             } catch {
                 lastError = error.localizedDescription
                 return
