@@ -5,7 +5,7 @@ import SwiftUI
 struct FocusTab: View {
     @Bindable var track: TrackStore
     var body: some View {
-        NavigationStack { TrackContent(track: track, part: .focus).navigationTitle("Focus") }
+        NavigationStack { FocusContent(track: track).navigationTitle("Focus") }
     }
 }
 

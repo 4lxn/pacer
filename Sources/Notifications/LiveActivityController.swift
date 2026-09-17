@@ -41,3 +41,30 @@ enum LiveActivityController {
         for a in Activity<PacerActivityAttributes>.activities { await a.end(nil, dismissalPolicy: .immediate) }
     }
 }
+
+
+@MainActor
+enum FocusActivityController {
+    static func sync(track: TrackStore, now: Date = .now) async {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        let existing = Activity<FocusActivityAttributes>.activities
+        guard let since = track.runningSince else {
+            for a in existing { await a.end(nil, dismissalPolicy: .immediate) }
+            return
+        }
+        let state = FocusActivityAttributes.ContentState(subject: track.runningTopic.isEmpty ? "Focus" : track.runningTopic, start: since,
+                                                        until: track.runningUntil, todayMinutes: track.studyMinutes(on: now))
+        let content = ActivityContent(state: state, staleDate: (track.runningUntil ?? now.addingTimeInterval(3600)).addingTimeInterval(30 * 60))
+        if let current = existing.first {
+            for extra in existing.dropFirst() { await extra.end(nil, dismissalPolicy: .immediate) }
+            if current.content.state != state { await current.update(content) }
+            return
+        }
+        do {
+            _ = try Activity.request(attributes: FocusActivityAttributes(), content: content, pushType: nil)
+            Logger(subsystem: "com.alan.autopiloto", category: "live-activity").info("Started focus Live Activity")
+        } catch {
+            Logger(subsystem: "com.alan.autopiloto", category: "live-activity").error("Focus Live Activity: \(error.localizedDescription)")
+        }
+    }
+}

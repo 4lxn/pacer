@@ -10,6 +10,14 @@ struct StudySession: Codable, Identifiable, Hashable, Sendable {
     var minutes: Int { Int(end.timeIntervalSince(start) / 60) }
 }
 
+/// What you focus on. Sessions reference it by name (older sessions had free-text topics).
+struct Subject: Codable, Identifiable, Hashable, Sendable {
+    var id: String = UUID().uuidString
+    var name: String
+    var weeklyGoalMinutes: Int = 0   // 0 = no goal
+    var symbol: String = "book"
+}
+
 struct IncomeEntry: Codable, Identifiable, Hashable, Sendable {
     var id: String = UUID().uuidString
     var date: Date
@@ -29,9 +37,11 @@ final class TrackStore {
         var runningTopic: String
         var runningUntil: Date?
         var monthlyIncomeGoal: Decimal?
+        var subjects: [Subject]?
     }
 
     private(set) var sessions: [StudySession] = []
+    private(set) var subjects: [Subject] = []
     private(set) var income: [IncomeEntry] = []
     var weeklyStudyGoalMinutes = 300 { didSet { save() } }
     var monthlyIncomeGoal: Decimal = 0 { didSet { save() } }
@@ -54,6 +64,11 @@ final class TrackStore {
             sessions = s.sessions; income = s.income; weeklyStudyGoalMinutes = s.weeklyStudyGoalMinutes
             runningSince = s.runningSince; runningTopic = s.runningTopic; runningUntil = s.runningUntil
             monthlyIncomeGoal = s.monthlyIncomeGoal ?? 0
+            subjects = s.subjects ?? []
+            // Adopt topics from older sessions as subjects.
+            for topic in Set(sessions.map(\.topic)) where topic != "Study" && !subjects.contains(where: { $0.name.caseInsensitiveCompare(topic) == .orderedSame }) {
+                subjects.append(Subject(name: topic))
+            }
         }
     }
 
@@ -123,6 +138,41 @@ final class TrackStore {
         return totals.map { ($0.key, $0.value) }.sorted { $0.minutes > $1.minutes }
     }
 
+    // MARK: - Subjects
+
+    func subject(named name: String) -> Subject? { subjects.first { $0.name.caseInsensitiveCompare(name) == .orderedSame } }
+
+    @discardableResult
+    func upsertSubject(_ subject: Subject) -> Subject {
+        if let i = subjects.firstIndex(where: { $0.id == subject.id || $0.name.caseInsensitiveCompare(subject.name) == .orderedSame }) {
+            let old = subjects[i]
+            var s = subject; s.id = old.id
+            subjects[i] = s
+            if old.name != s.name { for j in sessions.indices where sessions[j].topic == old.name { sessions[j].topic = s.name } }
+            save(); return s
+        }
+        subjects.append(subject)
+        save()
+        return subject
+    }
+
+    func deleteSubject(id: String) {
+        subjects.removeAll { $0.id == id }
+        save()
+    }
+
+    func minutes(subject: String, weekOf date: Date) -> Int {
+        guard let week = calendar.dateInterval(of: .weekOfYear, for: date) else { return 0 }
+        return sessions.filter { week.contains($0.start) && $0.topic.caseInsensitiveCompare(subject) == .orderedSame }.reduce(0) { $0 + $1.minutes }
+    }
+
+    /// Extend the running focus target by `minutes` (or set one if it was open).
+    func extendFocus(by minutes: Int, now: Date = .now) {
+        guard runningSince != nil else { return }
+        runningUntil = max(runningUntil ?? now, now).addingTimeInterval(Double(minutes) * 60)
+        save()
+    }
+
     /// Consecutive days (ending today or yesterday) with at least `minimum` minutes.
     func studyStreak(now: Date, minimum: Int = 20) -> Int {
         var streak = 0
@@ -185,7 +235,8 @@ final class TrackStore {
     func coachSummary(now: Date) -> String {
         var lines = ["## Study: \(studyMinutes(on: now)) min today, \(studyMinutes(weekOf: now)) / \(weeklyStudyGoalMinutes) min this week, streak \(studyStreak(now: now)) days"]
         let topics = studyByTopic(weekOf: now)
-        if !topics.isEmpty { lines.append("By topic: " + topics.map { "\($0.topic) \($0.minutes) min" }.joined(separator: ", ")) }
+        if !topics.isEmpty { lines.append("By subject this week: " + topics.map { "\($0.topic) \($0.minutes) min" }.joined(separator: ", ")) }
+        if !subjects.isEmpty { lines.append("Subjects: " + subjects.map { $0.weeklyGoalMinutes > 0 ? "\($0.name) (goal \($0.weeklyGoalMinutes) min/wk)" : $0.name }.joined(separator: ", ")) }
         if monthlyIncomeGoal > 0 { lines.append("Income this month: \(incomeTotal(monthOf: now)) of goal \(monthlyIncomeGoal)") }
         if let since = runningSince {
             lines.append("A study session is running since \(since.formatted(date: .omitted, time: .shortened)) (\(runningTopic)).")
@@ -197,6 +248,6 @@ final class TrackStore {
 
     private func save() {
         JSONFile.save(Snapshot(sessions: sessions, income: income, weeklyStudyGoalMinutes: weeklyStudyGoalMinutes, runningSince: runningSince, runningTopic: runningTopic,
-                               runningUntil: runningUntil, monthlyIncomeGoal: monthlyIncomeGoal), to: fileURL)
+                               runningUntil: runningUntil, monthlyIncomeGoal: monthlyIncomeGoal, subjects: subjects), to: fileURL)
     }
 }

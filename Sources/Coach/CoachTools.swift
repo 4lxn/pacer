@@ -136,6 +136,13 @@ struct CoachTools {
         ], required: ["minutes"]),
         tool("delete_study_session", "Delete a study session by id (from get_study).", ["id": str("")], required: ["id"]),
         tool("set_income_goal", "Set the monthly income goal (0 clears it).", ["amount": num("")], required: ["amount"]),
+        tool("start_focus", "Start a focus session now (shows in the Dynamic Island). minutes 0 = open-ended.", [
+            "subject": str("Subject name; created if new"), "minutes": ["type": "integer", "description": "25, 50, 90 or 0 for open"],
+        ], required: ["subject"]),
+        tool("stop_focus", "Stop the running focus session and log it.", [:]),
+        tool("add_subject", "Add or update a focus subject with an optional weekly goal in minutes.", [
+            "name": str(""), "weekly_goal_minutes": ["type": "integer"],
+        ], required: ["name"]),
         tool("set_study_goal", "Set the weekly study goal in minutes.", ["minutes": ["type": "integer"]], required: ["minutes"]),
         tool("get_income", "This month's income entries with ids, per-source totals, month and year totals.", [:]),
         tool("add_income", "Log income.", [
@@ -541,6 +548,32 @@ struct CoachTools {
             guard let amount = Self.double(input["amount"]) else { return Result(output: "amount is required", isError: true) }
             track.monthlyIncomeGoal = Decimal(amount)
             return Result(output: "Monthly income goal set to \(amount)", summary: "Income goal: \(Int(amount))")
+
+        case "start_focus":
+            guard let subject = input["subject"] as? String, !subject.isEmpty else { return Result(output: "subject is required", isError: true) }
+            if track.isStudying { return Result(output: "A session is already running (\(track.runningTopic)); stop it first", isError: true) }
+            if track.subject(named: subject) == nil { track.upsertSubject(Subject(name: subject)) }
+            let minutes = Self.int(input["minutes"]) ?? 25
+            track.startStudy(topic: subject, at: today, focusMinutes: minutes > 0 ? minutes : nil)
+            let until = track.runningUntil
+            Task { @MainActor in
+                if let until { await NotificationScheduler.scheduleFocusEnd(at: until, topic: subject) }
+                await FocusActivityController.sync(track: track)
+            }
+            return Result(output: "Focus on \(subject) started" + (minutes > 0 ? " for \(minutes) min" : ""), summary: "Focus: \(subject)" + (minutes > 0 ? " · \(minutes) min" : ""))
+
+        case "stop_focus":
+            guard track.isStudying else { return Result(output: "No session running", isError: true) }
+            let session = track.stopStudy(at: today)
+            Task { @MainActor in NotificationScheduler.cancelFocusEnd(); await FocusActivityController.sync(track: track) }
+            return Result(output: session.map { "Logged \($0.minutes) min of \($0.topic)" } ?? "Stopped (under a minute, not logged)", summary: session.map { "Focus logged: \($0.minutes) min" } ?? "Focus stopped")
+
+        case "add_subject":
+            guard let name = input["name"] as? String, !name.isEmpty else { return Result(output: "name is required", isError: true) }
+            var subject = track.subject(named: name) ?? Subject(name: name)
+            if let goal = Self.int(input["weekly_goal_minutes"]) { subject.weeklyGoalMinutes = goal }
+            track.upsertSubject(subject)
+            return Result(output: "Subject \(name) saved", summary: "Subject: \(name)")
 
         case "set_study_goal":
             guard let m = Self.int(input["minutes"]), m > 0 else { return Result(output: "minutes is required", isError: true) }

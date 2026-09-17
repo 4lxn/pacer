@@ -77,6 +77,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
             }
         }
 
+        NotificationCenter.default.addObserver(forName: .pacerStopFocus, object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            MainActor.assumeIsolated {
+                track.stopStudy()
+                Task { NotificationScheduler.cancelFocusEnd(); await FocusActivityController.sync(track: self.track) }
+            }
+        }
+
         // A workout synced into Health closes its block even if the app never opens.
         health.startObserving { [weak self] in
             guard let self else { return }

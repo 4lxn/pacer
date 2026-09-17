@@ -8,6 +8,7 @@ struct AutopilotoWidgetBundle: WidgetBundle {
         DayListWidget()
         DayProgressWidget()
         PacerLiveActivity()
+        FocusLiveActivity()
     }
 }
 
