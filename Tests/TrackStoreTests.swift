@@ -67,3 +67,41 @@ final class TrackStoreTests: XCTestCase {
         XCTAssertEqual(again.income.count, 3)
     }
 }
+
+@MainActor
+final class LifeDepthTests: XCTestCase {
+    private let calendar: Calendar = {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "America/Mexico_City")!
+        return c
+    }()
+    private func date(_ d: Int, _ h: Int = 12, month: Int = 9) -> Date { calendar.date(from: DateComponents(year: 2026, month: month, day: d, hour: h))! }
+
+    func testStudyByDayTopicStreakAndFocus() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let track = TrackStore(fileURL: dir.appendingPathComponent("track.json"), calendar: calendar)
+        track.addSession(start: date(16, 9), minutes: 30, topic: "Swift")
+        track.addSession(start: date(15, 9), minutes: 25, topic: "Swift")
+        track.addSession(start: date(14, 9), minutes: 45, topic: "Math")
+        track.addSession(start: date(12, 9), minutes: 10, topic: "Math")   // too short for the streak, and breaks it
+        XCTAssertEqual(track.studyStreak(now: date(16)), 3)
+        XCTAssertEqual(track.studyStreak(now: date(17)), 3)                  // yesterday counts when today is empty
+        XCTAssertEqual(track.studyStreak(now: date(18)), 0)
+        XCTAssertEqual(track.studyMinutesByDay(days: 3, now: date(16)).map(\.minutes), [45, 25, 30])
+        XCTAssertEqual(track.studyByTopic(weekOf: date(16)).map(\.topic), ["Swift", "Math"])   // week of Mon 14: Swift 55, Math 45
+
+        track.startStudy(topic: "Swift", at: date(16, 20), focusMinutes: 25)
+        XCTAssertEqual(track.runningUntil, date(16, 20).addingTimeInterval(1500))
+        XCTAssertEqual(TrackStore(fileURL: dir.appendingPathComponent("track.json"), calendar: calendar).runningUntil, track.runningUntil)
+        XCTAssertNotNil(track.stopStudy(at: date(16, 20).addingTimeInterval(1800)))
+        XCTAssertNil(track.runningUntil)
+
+        track.monthlyIncomeGoal = 30000
+        track.addIncome(source: "Salary", amount: 20000, on: date(1))
+        track.addIncome(source: "Freelance", amount: 5000, on: date(3, month: 8))
+        let months = track.incomeByMonth(months: 3, now: date(16))
+        XCTAssertEqual(months.map(\.amount), [0, 5000, 20000])
+        XCTAssertEqual(TrackStore(fileURL: dir.appendingPathComponent("track.json"), calendar: calendar).monthlyIncomeGoal, 30000)
+    }
+}

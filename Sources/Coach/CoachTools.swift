@@ -115,6 +115,7 @@ struct CoachTools {
             "minutes": ["type": "integer"], "topic": str(""), "start": str("HH:MM today; default = now minus minutes"),
         ], required: ["minutes"]),
         tool("delete_study_session", "Delete a study session by id (from get_study).", ["id": str("")], required: ["id"]),
+        tool("set_income_goal", "Set the monthly income goal (0 clears it).", ["amount": num("")], required: ["amount"]),
         tool("set_study_goal", "Set the weekly study goal in minutes.", ["minutes": ["type": "integer"]], required: ["minutes"]),
         tool("get_income", "This month's income entries with ids, per-source totals, month and year totals.", [:]),
         tool("add_income", "Log income.", [
@@ -449,6 +450,11 @@ struct CoachTools {
             guard let id = input["id"] as? String, track.sessions.contains(where: { $0.id == id }) else { return Result(output: "No session with that id", isError: true) }
             track.deleteSession(id: id)
             return Result(output: "Deleted session", summary: "Removed a study session")
+
+        case "set_income_goal":
+            guard let amount = Self.double(input["amount"]) else { return Result(output: "amount is required", isError: true) }
+            track.monthlyIncomeGoal = Decimal(amount)
+            return Result(output: "Monthly income goal set to \(amount)", summary: "Income goal: \(Int(amount))")
 
         case "set_study_goal":
             guard let m = Self.int(input["minutes"]), m > 0 else { return Result(output: "minutes is required", isError: true) }
