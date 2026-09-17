@@ -4,8 +4,11 @@ Deferred work with enough context to pick up cold. Effort is human-team → with
 
 ## P2
 
-- **Spanish localization** — the app's UI is English; Alan's market is MX. String catalog +
-  `Localizable.xcstrings`, coach already answers in the user's language. Effort: L → M.
+- **Spanish localization** — the app's UI is English; Alan's market is MX. `xcodebuild
+  -exportLocalizations` (2026-09-17) finds only 178 strings because most titles flow through
+  helpers that take `String` (`section(_:)`, `stat(_:_:)`, `chip(_:)`, `eyebrow(_:)`, notification
+  bodies). Step 1: switch those helpers to `LocalizedStringKey` / `String(localized:)`; step 2: add
+  `Localizable.xcstrings` and fill es-MX. Coach already answers in the user's language. Effort: L → M.
 
 - **Moved/one-off notifications beyond tomorrow** — `rearmCheckIns` covers today + tomorrow, so a
   block moved for the day after tomorrow gets its one-shot start only once that day is within the
