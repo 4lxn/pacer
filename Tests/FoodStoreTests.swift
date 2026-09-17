@@ -23,16 +23,13 @@ final class FoodStoreTests: XCTestCase {
     private var legacyURL: URL { dir.appendingPathComponent("completions.json") }
     private func date(_ d: Int, _ h: Int) -> Date { calendar.date(from: DateComponents(year: 2026, month: 9, day: d, hour: h))! }
 
-    func testFreshInstallIsEmptyLegacyIsSeeded() throws {
-        XCTAssertTrue(FoodStore(fileURL: fileURL, legacyMarker: legacyURL, calendar: calendar).pantry.isEmpty)
-        try Data("{}".utf8).write(to: legacyURL)
-        let seeded = FoodStore(fileURL: fileURL, legacyMarker: legacyURL, calendar: calendar)
-        XCTAssertEqual(seeded.pantry.count, FoodStore.seedPantry.count)
-        XCTAssertEqual(seeded.presets.count, FoodStore.seedPresets.count)
+    func testFreshInstallIsEmpty() {
+        XCTAssertTrue(FoodStore(fileURL: fileURL, calendar: calendar).pantry.isEmpty)
+        XCTAssertFalse(FoodStore.seedPantry.isEmpty)
     }
 
     func testMacrosPerDayAndPersistence() {
-        let store = FoodStore(fileURL: fileURL, legacyMarker: legacyURL, calendar: calendar)
+        let store = FoodStore(fileURL: fileURL, calendar: calendar)
         store.log(name: "Shake", kcal: 450, proteinGrams: 40, at: date(16, 8), saveAsPreset: true)
         store.log(name: "Beef + rice", kcal: 800, proteinGrams: 60, at: date(16, 14), saveAsPreset: false)
         store.log(name: "Yesterday", kcal: 500, proteinGrams: 30, at: date(15, 20), saveAsPreset: false)
@@ -40,7 +37,7 @@ final class FoodStoreTests: XCTestCase {
         XCTAssertEqual(store.meals(on: date(16, 22)).map(\.name), ["Shake", "Beef + rice"])
         XCTAssertEqual(store.presets.map(\.name), ["Shake"])
 
-        let again = FoodStore(fileURL: fileURL, legacyMarker: legacyURL, calendar: calendar)
+        let again = FoodStore(fileURL: fileURL, calendar: calendar)
         XCTAssertEqual(again.meals.count, 3)
         XCTAssertEqual(again.presets.count, 1)
         again.log(again.presets[0], at: date(16, 23))
@@ -48,7 +45,7 @@ final class FoodStoreTests: XCTestCase {
     }
 
     func testGroceryListAndAdjust() {
-        let store = FoodStore(fileURL: fileURL, legacyMarker: legacyURL, calendar: calendar)
+        let store = FoodStore(fileURL: fileURL, calendar: calendar)
         let rice = PantryItem(name: "Rice", quantity: 800, unit: "g", minQuantity: 700)
         let eggs = PantryItem(name: "Eggs", quantity: 2, unit: "pcs", minQuantity: 6)
         store.upsert(rice); store.upsert(eggs)

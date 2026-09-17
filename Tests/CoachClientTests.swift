@@ -47,16 +47,11 @@ final class CoachClientTests: XCTestCase {
     }
 
     @MainActor
-    func testCoachProfileSeedsFromLegacyOrTemplate() throws {
+    func testCoachProfileStartsFromTheTemplate() throws {
         let defaults = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
-        let missing = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        XCTAssertEqual(CoachProfile.load(defaults: defaults, legacyMarker: missing), CoachProfile.template)
-        let legacy = FileManager.default.temporaryDirectory.appendingPathComponent("legacy-\(UUID().uuidString)")
-        try Data("{}".utf8).write(to: legacy)
-        let other = UserDefaults(suiteName: "test-\(UUID().uuidString)")!
-        XCTAssertEqual(CoachProfile.load(defaults: other, legacyMarker: legacy), CoachContext.training)
-        CoachProfile.save("mine", defaults: other)
-        XCTAssertEqual(CoachProfile.load(defaults: other, legacyMarker: legacy), "mine")
+        XCTAssertEqual(CoachProfile.load(defaults: defaults), CoachProfile.template)
+        CoachProfile.save("mine", defaults: defaults)
+        XCTAssertEqual(CoachProfile.load(defaults: defaults), "mine")
     }
 
     func testParseJoinsTextBlocks() throws {
@@ -81,9 +76,9 @@ final class CoachClientTests: XCTestCase {
         let now = calendar.date(from: DateComponents(year: 2026, month: 9, day: 16, hour: 11, minute: 0))!
         let snapshot = CoachContext.snapshot(blocks: Plan.blocks.filter { $0.occurs(on: now, calendar: calendar) }, now: now, completed: ["b01"], calendar: calendar)
         XCTAssertTrue(snapshot.contains("Wednesday 2026-09-16 11:00"))
-        XCTAssertTrue(snapshot.contains("Gym · Min-Max B1 today: Upper 2."))
+        XCTAssertTrue(snapshot.contains("Gym today: Upper."))
         XCTAssertTrue(snapshot.contains("07:30 Wake up — done"))
         XCTAssertTrue(snapshot.contains("10:00 Work block — current"))
-        XCTAssertTrue(snapshot.contains("anytime Send one application — not done yet"))
+        XCTAssertTrue(snapshot.contains("anytime One thing for the future — not done yet"))
     }
 }

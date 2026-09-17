@@ -1,7 +1,7 @@
 import Foundation
 
-/// The static part of the Coach system prompt, editable by the user. Installs that predate the
-/// editor keep the original text; fresh installs start from a short template.
+/// The static part of the Coach system prompt, editable by the user; new installs start from a
+/// short template.
 @MainActor
 enum CoachProfile {
     static let key = "coachProfile"
@@ -25,11 +25,10 @@ enum CoachProfile {
     (what you must never do, e.g. medical advice)
     """
 
-    static func load(defaults: UserDefaults = .standard, legacyMarker: URL = CompletionStore.defaultURL) -> String {
+    static func load(defaults: UserDefaults = .standard) -> String {
         if let saved = defaults.string(forKey: key) { return saved }
-        let seeded = FileManager.default.fileExists(atPath: legacyMarker.path) ? CoachContext.training : template
-        defaults.set(seeded, forKey: key)
-        return seeded
+        defaults.set(template, forKey: key)
+        return template
     }
 
     static func save(_ text: String, defaults: UserDefaults = .standard) {

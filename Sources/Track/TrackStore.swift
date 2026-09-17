@@ -46,7 +46,7 @@ final class TrackStore {
     init(fileURL: URL = TrackStore.defaultURL, calendar: Calendar = .current) {
         self.fileURL = fileURL
         self.calendar = calendar
-        if let data = try? Data(contentsOf: fileURL), let s = try? JSONDecoder().decode(Snapshot.self, from: data) {
+        if case .loaded(let s) = JSONFile.load(Snapshot.self, from: fileURL) {
             sessions = s.sessions; income = s.income; weeklyStudyGoalMinutes = s.weeklyStudyGoalMinutes
             runningSince = s.runningSince; runningTopic = s.runningTopic
         }
@@ -147,12 +147,6 @@ final class TrackStore {
     // MARK: - Persistence
 
     private func save() {
-        do {
-            try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let s = Snapshot(sessions: sessions, income: income, weeklyStudyGoalMinutes: weeklyStudyGoalMinutes, runningSince: runningSince, runningTopic: runningTopic)
-            try JSONEncoder().encode(s).write(to: fileURL, options: .atomic)
-        } catch {
-            assertionFailure("TrackStore save failed: \(error)")
-        }
+        JSONFile.save(Snapshot(sessions: sessions, income: income, weeklyStudyGoalMinutes: weeklyStudyGoalMinutes, runningSince: runningSince, runningTopic: runningTopic), to: fileURL)
     }
 }

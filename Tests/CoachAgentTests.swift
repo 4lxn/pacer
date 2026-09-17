@@ -48,12 +48,15 @@ final class CoachAgentTests: XCTestCase {
     }
 
     private func makeTools() throws -> CoachTools {
-        let legacy = dir.appendingPathComponent("completions.json")
-        try Data("{}".utf8).write(to: legacy)
+        let plan = PlanStore(fileURL: dir.appendingPathComponent("plan.json"))
+        plan.replace(with: Plan.blocks)
+        let food = FoodStore(fileURL: dir.appendingPathComponent("food.json"), calendar: calendar)
+        for item in FoodStore.seedPantry { food.upsert(item) }
+        for preset in FoodStore.seedPresets { food.addPreset(name: preset.name, kcal: preset.kcal, proteinGrams: preset.proteinGrams) }
         return CoachTools(
-            plan: PlanStore(fileURL: dir.appendingPathComponent("plan.json"), legacyMarker: legacy),
-            completions: CompletionStore(fileURL: legacy, calendar: calendar),
-            food: FoodStore(fileURL: dir.appendingPathComponent("food.json"), legacyMarker: legacy, calendar: calendar),
+            plan: plan,
+            completions: CompletionStore(fileURL: dir.appendingPathComponent("completions.json"), calendar: calendar),
+            food: food,
             wardrobe: WardrobeStore(fileURL: dir.appendingPathComponent("wardrobe.json")),
             health: HealthStore(),
             track: TrackStore(fileURL: dir.appendingPathComponent("track.json"), calendar: calendar),
@@ -109,6 +112,10 @@ final class CoachAgentTests: XCTestCase {
 
         _ = tools.run(name: "mark_done", input: ["id": "b01"])
         XCTAssertTrue(tools.completions.completed(on: tools.now()).contains("b01"))
+        XCTAssertEqual(tools.run(name: "skip_today", input: ["id": "b09"]).summary, "Skipped Lunch today")
+        XCTAssertTrue(tools.run(name: "get_plan", input: [:]).output.contains("b09 | 13:00–13:40 | Lunch | window | skipped"))
+        _ = tools.run(name: "skip_today", input: ["id": "b09", "undo": true])
+        XCTAssertFalse(tools.completions.skipped(on: tools.now()).contains("b09"))
 
         XCTAssertEqual(tools.run(name: "add_garment", input: ["name": "navy hoodie", "category": "outer", "color": "navy", "warmth": 3]).summary, "Closet: added navy hoodie")
         XCTAssertEqual(tools.run(name: "wear_outfit", input: ["names": ["Navy Hoodie"]]).summary, "Wearing navy hoodie")

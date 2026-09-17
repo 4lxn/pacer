@@ -41,6 +41,9 @@ struct CoachTools {
         tool("mark_done", "Mark a block done for today (or undo with done=false).", [
             "id": str("Block id"), "done": ["type": "boolean", "description": "default true"],
         ], required: ["id"]),
+        tool("skip_today", "Skip a block for today only (it leaves today's count; the plan is unchanged). undo=true puts it back.", [
+            "id": str("Block id"), "undo": ["type": "boolean"],
+        ], required: ["id"]),
         // Food
         tool("get_pantry", "Pantry items with quantity, unit and minimum; items below minimum are on the grocery list.", [:]),
         tool("add_pantry_item", "Add a pantry item, or set quantity/unit/minimum of an existing one with the same name.", [
@@ -121,9 +124,10 @@ struct CoachTools {
         case "get_plan":
             let blocks = DayLogic.sorted(plan.today(on: today, calendar: calendar))
             let completed = completions.completed(on: today)
+            let skipped = completions.skipped(on: today)
             let lines = blocks.map { b -> String in
                 let time = b.start.map { NotificationScheduler.clock($0) + "–" + NotificationScheduler.clock(b.end ?? $0) } ?? "anytime"
-                let status = b.status(now: today, completed: completed, calendar: calendar)
+                let status = b.status(now: today, completed: completed, skipped: skipped, calendar: calendar)
                 return "\(b.id) | \(time) | \(b.label) | \(b.kind.rawValue) | \(status)" + (b.isAnchor ? " | anchor" : "")
             }
             return Result(output: lines.isEmpty ? "No blocks today." : lines.joined(separator: "\n"))
@@ -171,6 +175,15 @@ struct CoachTools {
             let isDone = completions.completed(on: today).contains(id)
             if done != isDone { completions.toggle(id, on: today) }
             return Result(output: "\(block.label) is now \(done ? "done" : "not done")", summary: "\(done ? "Done" : "Undone"): \(block.label)")
+
+        case "skip_today":
+            guard let id = input["id"] as? String, let block = plan.block(id: id) else { return Result(output: "No block with that id", isError: true) }
+            if input["undo"] as? Bool == true {
+                completions.unskip(id, on: today)
+                return Result(output: "\(block.label) is back on today's plan", summary: "Unskipped \(block.label)")
+            }
+            completions.skip(id, on: today)
+            return Result(output: "Skipped \(block.label) for today", summary: "Skipped \(block.label) today")
 
         case "get_pantry":
             guard !food.pantry.isEmpty else { return Result(output: "Pantry is empty.") }

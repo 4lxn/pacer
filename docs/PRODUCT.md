@@ -77,7 +77,7 @@ Full record with every decision: `~/.gstack/projects/4lxn-autopiloto/ceo-plans/2
 
 | PR | Contents | Gate |
 |---|---|---|
-| PR1 | `Block.checkIn` (default on for window ≥ 20 min), one-shot check-ins at end+5 with Done/Skip today, `.skipped` per day, midnight fix (`notification.date`), PlanStore never overwrites an undecodable file, founder seed removed from the binary, onboarding teaches the long-press, `JSONFile` + persistence banner | TestFlight internal → ~10 external testers |
+| PR1 ✅ | `Block.checkIn` (default on for window ≥ 20 min), one-shot check-ins at end+5 with Done/Skip today, `.skipped` per day, midnight fix (`notification.date`), PlanStore never overwrites an undecodable file, founder seed removed from the binary, onboarding teaches the long-press, `JSONFile` + persistence banner, BGAppRefresh re-arm, `skip_today` coach tool, Markdown chat rendering | TestFlight internal → ~10 external testers |
 | PR2 | `Replanner` (pure) + `DayOverrides` + Undo + `DayMutator` + `REPLAN` action + Replan/Skip on missed rows + coach `move_today` / `skip_today` / `undo_replan` | Keep Replan only if ≥ 30 % of eligible check-ins choose Replan and ≥ 70 % are not undone after 2 weeks with ≥ 5 testers |
 | PR3 | App Group (`defaultURL` change, no migration code) + Now/Next widget (systemSmall) sharing `Models/` + `DayLogic` | — |
 | PR4 | HealthKit background delivery + Settings sheet + Diagnostics ("Copy report") + "Your week" (on-device only) | — |

@@ -39,6 +39,11 @@ targets:
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Pick a photo of a garment to add it to your closet."
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1"
+    info:
+      path: Info.plist
+      properties:
+        BGTaskSchedulerPermittedIdentifiers: [com.alan.autopiloto.rearm]
+        UIBackgroundModes: [fetch]
     entitlements:
       path: Autopiloto.entitlements
       properties:
