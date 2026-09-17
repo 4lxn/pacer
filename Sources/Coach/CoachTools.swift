@@ -26,11 +26,15 @@ struct CoachTools {
     static let definitions: [[String: Any]] = [
         // Plan
         tool("get_plan", "Today's blocks with ids, times and status (done, current, upcoming, missed, skipped). Blocks moved for today only are marked 'moved'.", [:]),
-        tool("add_block", "Add a block to the plan. Times are HH:MM 24h. kind: fixed (notifies at start), window (anytime in range), free (no clock).", [
+        tool("add_block", "Add a block to the weekly plan, or with today_only=true a one-off block for today only (the plan is unchanged). Times are HH:MM 24h. kind: fixed (notifies at start), window (anytime in range), free (no clock).", [
             "label": str("Short label"), "kind": enumOf(["fixed", "window", "free"]),
             "start": str("HH:MM, omit for free"), "end": str("HH:MM, omit for free"),
             "weekdays": ["type": "array", "items": ["type": "integer"], "description": "1=Sunday…7=Saturday; omit for every day"],
+            "today_only": ["type": "boolean", "description": "true = just for today"],
         ], required: ["label", "kind"]),
+        tool("set_block_note", "Attach a short note to a block for today only (e.g. what to do in that block). Empty note removes it.", [
+            "id": str("Block id"), "note": str("The note"),
+        ], required: ["id", "note"]),
         tool("update_block", "Change a block's label, times, kind or weekdays. Only pass the fields to change.", [
             "id": str("Block id from get_plan"), "label": str(""), "kind": enumOf(["fixed", "window", "free"]),
             "start": str("HH:MM"), "end": str("HH:MM"),
@@ -130,11 +134,17 @@ struct CoachTools {
             let blocks = DayLogic.sorted(mutator.effectivePlan(on: today))
             let completed = completions.completed(on: today)
             let skipped = completions.skipped(on: today)
-            let moved = mutator.days.override(dayKey: mutator.dayKey(today)).moved
+            let override = mutator.days.override(dayKey: mutator.dayKey(today))
+            let extras = Set(override.extras.map(\.id))
             let lines = blocks.map { b -> String in
                 let time = b.start.map { NotificationScheduler.clock($0) + "–" + NotificationScheduler.clock(b.end ?? $0) } ?? "anytime"
                 let status = b.status(now: today, completed: completed, skipped: skipped, calendar: calendar)
-                return "\(b.id) | \(time) | \(b.label) | \(b.kind.rawValue) | \(status)" + (b.isAnchor ? " | anchor" : "") + (moved[b.id] != nil ? " | moved" : "")
+                var line = "\(b.id) | \(time) | \(b.label) | \(b.kind.rawValue) | \(status)"
+                if b.isAnchor { line += " | anchor" }
+                if override.moved[b.id] != nil { line += " | moved" }
+                if extras.contains(b.id) { line += " | today only" }
+                if let note = override.notes[b.id] { line += " | note: \(note)" }
+                return line
             }
             return Result(output: lines.isEmpty ? "No blocks today." : lines.joined(separator: "\n"))
 
@@ -148,8 +158,14 @@ struct CoachTools {
                     return Result(output: "start and end (HH:MM) are required for fixed/window blocks", isError: true)
                 }
                 block.start = start; block.end = end
+                block.checkIn = Block.defaultCheckIn(kind: kind, start: start, end: end, isAnchor: false)
             }
             block.weekdays = Self.weekdays(input["weekdays"])
+            if input["today_only"] as? Bool == true {
+                block.weekdays = nil
+                mutator.addExtra(block, dayKey: mutator.dayKey(today))
+                return Result(output: "Added \(block.label) for today only (\(block.id))", summary: "Added \(block.label) for today")
+            }
             plan.upsert(block)
             return Result(output: "Added block \(block.id): \(label)", summary: "Added block “\(label)”")
 
@@ -190,6 +206,12 @@ struct CoachTools {
             }
             mutator.skipToday(id, dayKey: mutator.dayKey(today))
             return Result(output: "Skipped \(block.label) for today", summary: "Skipped \(block.label) today")
+
+        case "set_block_note":
+            guard let id = input["id"] as? String, let block = mutator.block(id: id, on: today) else { return Result(output: "No block with that id today", isError: true) }
+            let note = input["note"] as? String ?? ""
+            mutator.days.setNote(note, blockID: id, dayKey: mutator.dayKey(today))
+            return Result(output: note.isEmpty ? "Note removed from \(block.label)" : "Note set on \(block.label)", summary: note.isEmpty ? "Note removed: \(block.label)" : "Note: \(block.label)")
 
         case "move_today":
             guard let id = input["id"] as? String, plan.block(id: id) != nil else { return Result(output: "No block with that id", isError: true) }

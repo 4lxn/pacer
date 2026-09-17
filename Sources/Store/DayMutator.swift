@@ -137,6 +137,20 @@ final class DayMutator {
         return true
     }
 
+    /// A block that exists only on that day. Not undoable; delete it from its detail.
+    func addExtra(_ block: Block, dayKey: String) {
+        days.addExtra(block, dayKey: dayKey)
+        enqueueRearm()
+    }
+
+    func removeExtra(_ id: String, dayKey: String) {
+        days.removeExtra(id, dayKey: dayKey)
+        completions.unskip(id, on: date(dayKey) ?? now())
+        NotificationScheduler.cancelCheckIn(id, dayKey: dayKey, center: center)
+        center.removePending([NotificationScheduler.movedIdentifier(id, dayKey: dayKey)])
+        enqueueRearm()
+    }
+
     func clearLastChange() { lastChange = nil }
 
     // MARK: - Notifications
@@ -146,7 +160,10 @@ final class DayMutator {
         _ = await NotificationScheduler.rearmCheckIns(
             plan: { [self] day in effectivePlan(on: day) }, now: now(),
             completed: { [self] in completions.completed(dayKey: $0) }, skipped: { [self] in completions.skipped(dayKey: $0) },
-            movedIDs: { [self] key in Set(days.override(dayKey: key).moved.keys) },
+            movedIDs: { [self] key in
+                let o = days.override(dayKey: key)
+                return Set(o.moved.keys).union(o.extras.map(\.id))
+            },
             checkIns: days.checkInsEnabled, calendar: calendar, center: center
         )
         metrics.markRearm(now())

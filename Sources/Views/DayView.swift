@@ -16,6 +16,10 @@ struct DayView: View {
     @State private var bannerDismissed = false
     @State private var editingPlan = false
     @State private var showingSettings = false
+    @State private var detail: Block?
+    @State private var editingBlock: Block?
+    @State private var addingToday = false
+    @State private var showTomorrow = false
     private var persistence: PersistenceState { PersistenceState.shared }
 
     private let calendar = Calendar.current
@@ -23,6 +27,7 @@ struct DayView: View {
 
     private var blocks: [Block] { DayLogic.sorted(mutator.effectivePlan(on: now)) }
     private var moved: Set<String> { Set(days.override(dayKey: mutator.dayKey(now)).moved.keys) }
+    private var dayNotes: [String: String] { days.override(dayKey: mutator.dayKey(now)).notes }
     private var completed: Set<String> { store.completed(on: now) }
     private var skipped: Set<String> { store.skipped(on: now) }
     /// Skipped blocks leave the denominator: "n / N today" counts what is still on the plan.
@@ -41,6 +46,7 @@ struct DayView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     progress
+                    historyStrip
                     if let error = persistence.lastError { persistenceBanner(error) }
                     if notificationsDenied && !bannerDismissed { permissionBanner }
                     NowCard(
@@ -61,6 +67,7 @@ struct DayView: View {
                         section("Missed", count: missed.count, blocks: missed, empty: nil, hint: "Hold a row to move it later or skip it today.")
                     }
                     if !finished.isEmpty { section("Done", count: nil, blocks: finished, empty: nil) }
+                    tomorrow
                 }
                 .padding()
                 .padding(.bottom, 72)   // room for the undo toast
@@ -73,9 +80,19 @@ struct DayView: View {
             .navigationSubtitle(now.formatted(.dateTime.weekday(.wide).day().month(.wide)))
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button { addingToday = true } label: { Label("Just for today", systemImage: "plus") }
                     Button { editingPlan = true } label: { Label("Edit plan", systemImage: "slider.horizontal.3") }
                     Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
                 }
+            }
+            .sheet(item: $detail) { block in
+                BlockDetailSheet(block: block, now: now, mutator: mutator) { editingBlock = $0 }
+            }
+            .sheet(item: $editingBlock) { block in
+                BlockEditor(block: plan.block(id: block.id) ?? block, isNew: false) { plan.upsert($0) } onDelete: { plan.delete(id: $0) }
+            }
+            .sheet(isPresented: $addingToday) {
+                TodayOnlySheet(now: now) { mutator.addExtra($0, dayKey: mutator.dayKey(now)) }
             }
         }
         .overlay(alignment: .bottom) { undoToast }
@@ -97,6 +114,7 @@ struct DayView: View {
         .onAppear {
             #if DEBUG
             if CoachAccount.screenshotMode == "settings" { showingSettings = true }
+            if CoachAccount.screenshotMode == "detail" { detail = current ?? blocks.first }
             #endif
         }
         .sheet(isPresented: $showingSettings) { SettingsView(days: days, metrics: metrics, health: health, account: account, plan: plan) }
@@ -214,15 +232,16 @@ struct DayView: View {
                         BlockRow(
                             block: block,
                             status: block.status(now: now, completed: completed, skipped: skipped, calendar: calendar),
-                            subtitle: block.note(on: now, calendar: calendar),
+                            subtitle: dayNotes[block.id] ?? block.note(on: now, calendar: calendar),
                             moved: moved.contains(block.id),
                             onToggle: { mutator.toggleDone(block.id, on: now) },
+                            onOpen: { detail = block },
                             onSkip: { mutator.skipToday(block.id, dayKey: mutator.dayKey(now)) },
                             onUnskip: { mutator.unskip(block.id, on: now) },
                             onReplan: { mutator.replan(block.id, on: now) }
                         )
                         .transition(.opacity.combined(with: .move(edge: .top)))
-                        if block.id != blocks.last?.id { Divider().padding(.leading, 72) }
+                        if block.id != blocks.last?.id { Divider().padding(.leading, 116) }
                     }
                 }
                 .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
@@ -237,6 +256,67 @@ struct DayView: View {
 
     /// Check-ins are one-shot (today + tomorrow); re-arm after anything that changes what's done.
     private func rearmCheckIns() async { mutator.now = { .now }; await mutator.rearm() }
+
+    /// Two weeks of day scores, oldest first; today last. Taller = more of the plan done.
+    private var historyStrip: some View {
+        let days: [(key: String, score: Double?)] = (0..<14).reversed().compactMap { offset in
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: now) else { return nil }
+            let key = mutator.dayKey(day)
+            return (key, DayLogic.dayScore(mutator.effectivePlan(on: day), completed: store.completed(dayKey: key), skipped: store.skipped(dayKey: key)))
+        }
+        return VStack(alignment: .leading, spacing: 6) {
+            Text("Last 14 days").font(.caption).foregroundStyle(.secondary)
+            HStack(alignment: .bottom, spacing: 4) {
+                ForEach(days, id: \.key) { day in
+                    let score = day.score ?? 0
+                    let isToday = day.key == mutator.dayKey(now)
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color(uiColor: .tertiarySystemFill))
+                        .overlay(alignment: .bottom) {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(isToday ? Color.accentColor : Color.accentColor.opacity(0.55))
+                                .frame(height: max(score > 0 ? 3 : 0, 24 * score))
+                        }
+                        .frame(height: 24)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityLabel("\(day.key): \(Int(score * 100)) percent")
+                }
+            }
+            .animation(.snappy, value: doneCount)
+        }
+    }
+
+    /// Tomorrow's plan, folded; a glance at what's coming.
+    private var tomorrow: some View {
+        let day = calendar.date(byAdding: .day, value: 1, to: now) ?? now
+        let blocks = DayLogic.sorted(mutator.effectivePlan(on: day))
+        return DisclosureGroup(isExpanded: $showTomorrow) {
+            VStack(spacing: 0) {
+                ForEach(blocks) { block in
+                    HStack(spacing: 12) {
+                        Text(block.start.map(DayLogic.clock) ?? "any").font(.subheadline.monospacedDigit()).foregroundStyle(.secondary).frame(width: 48, alignment: .leading)
+                        Text(block.label)
+                        if let note = block.note(on: day, calendar: calendar) { Text(note).font(.caption).foregroundStyle(.secondary) }
+                        Spacer()
+                    }
+                    .padding(.vertical, 8).padding(.horizontal, 12)
+                    if block.id != blocks.last?.id { Divider().padding(.leading, 72) }
+                }
+            }
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+            .padding(.top, 8)
+        } label: {
+            HStack(spacing: 6) {
+                Text("Tomorrow").font(.headline)
+                Text("\(blocks.count)").font(.caption.weight(.semibold)).monospacedDigit()
+                    .padding(.horizontal, 7).padding(.vertical, 2)
+                    .background(Color(uiColor: .tertiarySystemFill), in: Capsule()).foregroundStyle(.secondary)
+                Text(day.formatted(.dateTime.weekday(.wide))).font(.subheadline).foregroundStyle(.secondary)
+            }
+        }
+        .tint(.secondary)
+        .padding(.horizontal, 4)
+    }
 
     /// One line + Undo, bottom of the screen, gone after a few seconds or a tap.
     @ViewBuilder

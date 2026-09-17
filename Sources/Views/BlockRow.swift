@@ -6,18 +6,25 @@ struct BlockRow: View {
     let subtitle: String?
     var moved = false
     let onToggle: () -> Void
+    var onOpen: (() -> Void)? = nil
     var onSkip: (() -> Void)? = nil
     var onUnskip: (() -> Void)? = nil
     var onReplan: (() -> Void)? = nil
 
     var body: some View {
-        Button(action: onToggle) {
+        Button(action: { (onOpen ?? onToggle)() }) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Image(systemName: status == .done ? "checkmark.circle.fill" : status == .skipped ? "minus.circle" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(status == .done ? Color.accentColor : .secondary)
-                    .contentTransition(.symbolEffect(.replace.downUp))
-                    .symbolEffect(.bounce, value: status == .done)
+                Button(action: onToggle) {
+                    Image(systemName: status == .done ? "checkmark.circle.fill" : status == .skipped ? "minus.circle" : "circle")
+                        .font(.title3)
+                        .foregroundStyle(status == .done ? Color.accentColor : .secondary)
+                        .contentTransition(.symbolEffect(.replace.downUp))
+                        .symbolEffect(.bounce, value: status == .done)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(status == .done ? "Mark not done" : "Mark done")
                 Text(timeText)
                     .font(.subheadline.monospacedDigit().weight(status == .missed ? .semibold : .regular))
                     .foregroundStyle(status == .missed ? .red : .secondary)

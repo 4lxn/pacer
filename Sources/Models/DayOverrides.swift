@@ -8,7 +8,20 @@ struct MovedTime: Codable, Equatable, Sendable {
 
 struct DayOverride: Codable, Equatable, Sendable {
     var moved: [String: MovedTime] = [:]
-    var isEmpty: Bool { moved.isEmpty }
+    /// Blocks that exist only on this day ("just for today").
+    var extras: [Block] = []
+    /// A note for a block on this day only.
+    var notes: [String: String] = [:]
+    var isEmpty: Bool { moved.isEmpty && extras.isEmpty && notes.isEmpty }
+
+    private enum CodingKeys: String, CodingKey { case moved, extras, notes }
+    init() {}
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        moved = try c.decodeIfPresent([String: MovedTime].self, forKey: .moved) ?? [:]
+        extras = try c.decodeIfPresent([Block].self, forKey: .extras) ?? []
+        notes = try c.decodeIfPresent([String: String].self, forKey: .notes) ?? [:]
+    }
 }
 
 /// One level of undo for the last Replan / Skip on a day. Persisted so it survives a relaunch and
@@ -24,13 +37,38 @@ extension DayLogic {
     /// Template blocks that occur on `date` with that day's overrides applied. Orphan ids (a block
     /// that no longer exists or no longer occurs) are ignored; an override survives template edits.
     static func effectivePlan(_ blocks: [Block], override: DayOverride?, on date: Date, calendar: Calendar = .current) -> [Block] {
-        blocks.filter { $0.occurs(on: date, calendar: calendar) }.map { block in
+        let template = blocks.filter { $0.occurs(on: date, calendar: calendar) }
+        return (template + (override?.extras ?? [])).map { block in
             guard let moved = override?.moved[block.id], block.kind != .free else { return block }
             var b = block
             b.start = moved.start
             b.end = moved.end
             return b
         }
+    }
+
+    enum HistoryMark: Equatable { case done, skipped, missed, off, pending }
+
+    /// The block's last `days` days, oldest first: done / skipped / missed / not scheduled, and
+    /// `pending` for today when it hasn't ended yet.
+    static func history(of block: Block, days: Int, now: Date, completed: (String) -> Set<String>, skipped: (String) -> Set<String>, calendar: Calendar = .current) -> [(dayKey: String, mark: HistoryMark)] {
+        (0..<days).reversed().compactMap { offset in
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: now) else { return nil }
+            let key = dayKey(day, calendar: calendar)
+            guard block.occurs(on: day, calendar: calendar) else { return (key, .off) }
+            if completed(key).contains(block.id) { return (key, .done) }
+            if skipped(key).contains(block.id) { return (key, .skipped) }
+            if offset == 0, let end = block.endDate(on: day, calendar: calendar), end > now { return (key, .pending) }
+            if offset == 0, block.kind == .free { return (key, .pending) }
+            return (key, .missed)
+        }
+    }
+
+    /// done / counted for a day; nil when nothing was planned.
+    static func dayScore(_ blocks: [Block], completed: Set<String>, skipped: Set<String>) -> Double? {
+        let counted = blocks.filter { !skipped.contains($0.id) }
+        guard !counted.isEmpty else { return nil }
+        return Double(counted.filter { completed.contains($0.id) }.count) / Double(counted.count)
     }
 
     static func minutes(_ c: DateComponents) -> Int { (c.hour ?? 0) * 60 + (c.minute ?? 0) }
