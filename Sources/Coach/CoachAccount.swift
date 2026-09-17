@@ -14,6 +14,9 @@ final class CoachAccount {
     private(set) var isSubscribed = false
     private(set) var product: Product?
     private(set) var lastError: String?
+    /// True after a products fetch that returned nothing (agreement not active, product not yet
+    /// propagated, or offline); the paywall shows a retry instead of a spinner.
+    private(set) var productUnavailable = false
     /// Debug-only: `AUTOPILOTO_SCREENSHOT=paywall` shows the subscribe screen without StoreKit
     /// (App Store review screenshots are taken from the simulator via `simctl`, which cannot
     /// attach the .storekit configuration).
@@ -86,10 +89,13 @@ final class CoachAccount {
     // MARK: - Subscription
 
     func loadProduct() async {
+        productUnavailable = false
         do {
             product = try await Product.products(for: [Self.productID]).first
+            if product == nil { productUnavailable = true }
         } catch {
             lastError = error.localizedDescription
+            productUnavailable = true
         }
         await refreshEntitlement()
     }

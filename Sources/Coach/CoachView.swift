@@ -52,7 +52,7 @@ struct CoachView: View {
                     if useOwnKey && !apiKey.isEmpty {
                         Button("Change API key", systemImage: "key") { keyDraft = ""; editingKey = true }
                     }
-                    if account.isSignedIn {
+                    if account.isSignedIn && !useOwnKey {
                         Button("Sign out", systemImage: "rectangle.portrait.and.arrow.right") { account.signOut() }
                     }
                     if CoachClient.proxyURL != nil {
@@ -229,6 +229,10 @@ struct CoachView: View {
                     .buttonStyle(.glassProminent).controlSize(.large)
                     Text("1-week free trial, then \(price) per month. Cancel anytime in Settings.")
                         .font(.footnote).foregroundStyle(.secondary)
+                } else if account.productUnavailable {
+                    Text("The subscription isn't available from the App Store right now.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    Button("Try again") { Task { await account.loadProduct() } }.buttonStyle(.glass)
                 } else {
                     ProgressView()
                 }
