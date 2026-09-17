@@ -231,3 +231,41 @@ final class CoachAgentTests: XCTestCase {
         XCTAssertEqual(CoachProfile.load(defaults: defaults), "## Goals\nlose fat\n\n## Memory\n- hates broccoli\n- gym closed Sundays")
     }
 }
+
+@MainActor
+final class ChatHistoryTests: XCTestCase {
+    func testConversationsListOpenDeleteAndLegacyAdoption() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let legacy = dir.appendingPathComponent("chat.json")
+        try JSONSerialization.data(withJSONObject: ["messages": [["role": "user", "content": "hola coach, qué toca hoy?"]], "toolSummaries": [:]]).write(to: legacy)
+
+        let chat = CoachChatStore(fileURL: legacy)
+        XCTAssertEqual(chat.conversations.count, 1)
+        XCTAssertEqual(chat.current.title, "hola coach, qué toca hoy?")   // adopted + auto-titled
+        XCTAssertEqual(chat.entries.count, 1)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path))
+
+        chat.newConversation()
+        XCTAssertEqual(chat.conversations.count, 2)
+        XCTAssertTrue(chat.entries.isEmpty)
+        chat.newConversation()   // no-op while blank
+        XCTAssertEqual(chat.conversations.count, 2)
+        chat.appendUser(text: String(repeating: "a", count: 60))
+        XCTAssertEqual(chat.current.title.count, 41)
+        XCTAssertEqual(chat.conversations.first?.id, chat.current.id)   // newest first
+
+        let older = chat.conversations[1].id
+        chat.open(older)
+        XCTAssertEqual(chat.entries.first?.text, "hola coach, qué toca hoy?")
+
+        // Survives a reload; delete falls back to the next conversation.
+        let reloaded = CoachChatStore(fileURL: legacy)
+        XCTAssertEqual(reloaded.conversations.count, 2)
+        reloaded.delete(reloaded.current.id)
+        XCTAssertEqual(reloaded.conversations.count, 1)
+        reloaded.delete(reloaded.current.id)
+        XCTAssertEqual(reloaded.conversations.count, 1)   // always one (blank) conversation
+        XCTAssertTrue(reloaded.entries.isEmpty)
+    }
+}
