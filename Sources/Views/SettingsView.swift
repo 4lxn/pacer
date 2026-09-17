@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Bindable var health: HealthStore
     @Bindable var account: CoachAccount
     let plan: PlanStore
+    @Bindable var sections: SectionStore
     @Environment(\.dismiss) private var dismiss
     @State private var editingProfile = false
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
@@ -22,6 +23,12 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    NavigationLink { SectionsView(sections: sections) } label: {
+                        LabeledContent("Sections", value: sections.enabled.map(\.title).joined(separator: " · "))
+                    }
+                } footer: { Text("Turn sections on or off and set their order in the tab bar.") }
+
                 Section {
                     DatePicker("Day ends at", selection: dayEnd, displayedComponents: .hourAndMinute)
                     Toggle("End-of-block check-ins", isOn: $days.checkInsEnabled)
@@ -220,5 +227,42 @@ struct DiagnosticsView: View {
             blocks: plan.blocks.count, checkInBlocks: plan.blocks.filter(\.checkIn).count, checkInsEnabled: days.checkInsEnabled,
             dayEnd: days.dayEnd, week: metrics.week(), files: files
         ))
+    }
+}
+
+
+/// Which tabs show, in what order. Data is kept when a section is off.
+struct SectionsView: View {
+    @Bindable var sections: SectionStore
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(sections.enabled) { s in row(s, on: true) }
+                    .onMove { sections.move(from: $0, to: $1) }
+            } header: { Text("On") } footer: { Text("Drag to reorder. Today always comes first; past five tabs iOS adds “More”.") }
+            let off = AppSection.allCases.filter { !sections.isOn($0) }
+            if !off.isEmpty {
+                Section("Off") { ForEach(off) { s in row(s, on: false) } }
+            }
+        }
+        .environment(\.editMode, .constant(.active))
+        .navigationTitle("Sections").navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func row(_ s: AppSection, on: Bool) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: s.symbol).foregroundStyle(s.tint).frame(width: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(s.title)
+                Text(s.pitch).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if s.isCore {
+                Text("always").font(.caption).foregroundStyle(.secondary)
+            } else {
+                Toggle("", isOn: Binding(get: { on }, set: { sections.set(s, on: $0) })).labelsHidden()
+            }
+        }
     }
 }

@@ -13,6 +13,7 @@ struct RootView: View {
     @Bindable var account: CoachAccount
     @Bindable var wardrobe: WardrobeStore
     @Bindable var agent: CoachAgent
+    @Bindable var sections: SectionStore
     @State private var selectedTab = RootView.initialTab
 
     /// Debug-only: `AUTOPILOTO_TAB=coach` opens on that tab (screenshots).
@@ -46,27 +47,35 @@ struct RootView: View {
 
     private var tabs: some View {
         TabView(selection: $selectedTab) {
-            DayView(store: store, plan: plan, days: days, mutator: mutator, metrics: metrics, health: health, track: track, account: account)
-                .tabItem { Label("Today", systemImage: "sun.max") }.tag("today")
-            TrainView(health: health, mutator: mutator)
-                .tabItem { Label("Train", systemImage: "figure.run") }.tag("train")
-            FoodView(food: food, account: account)
-                .tabItem { Label("Food", systemImage: "fork.knife") }.tag("food")
-            LifeView(track: track, wardrobe: wardrobe, account: account)
-                .tabItem { Label("Life", systemImage: "sparkles") }.tag("life")
-            CoachView(store: store, plan: plan, health: health, food: food, track: track, account: account, wardrobe: wardrobe, agent: agent)
-                .tabItem { Label("Coach", systemImage: "bubble.left.and.text.bubble.right") }.tag("coach")
+            ForEach(sections.enabled) { section in
+                view(for: section)
+                    .tabItem { Label(section.title, systemImage: section.symbol) }
+                    .tag(section.rawValue)
+            }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
         .fullScreenCover(isPresented: Binding(get: { plan.needsOnboarding }, set: { _ in })) {
-            OnboardingView { blocks, dayEnd in plan.replace(with: blocks); days.dayEnd = dayEnd }
+            OnboardingView { blocks, dayEnd, picked in plan.replace(with: blocks); days.dayEnd = dayEnd; sections.replace(picked) }
         }
         .onChange(of: plan.blocks) { _, blocks in
             WidgetCenter.shared.reloadAllTimelines()
             Task { await NotificationScheduler.register(blocks) }
         }
         .onOpenURL { url in
-            if url.host == "today" { selectedTab = "today" }
+            if let host = url.host, AppSection(rawValue: host) != nil { selectedTab = host }
+        }
+    }
+
+    @ViewBuilder
+    private func view(for section: AppSection) -> some View {
+        switch section {
+        case .today: DayView(store: store, plan: plan, days: days, mutator: mutator, metrics: metrics, health: health, track: track, account: account, sections: sections)
+        case .train: TrainView(health: health, mutator: mutator)
+        case .food: FoodView(food: food, account: account)
+        case .focus: FocusTab(track: track)
+        case .money: MoneyTab(track: track)
+        case .closet: ClosetTab(wardrobe: wardrobe, account: account)
+        case .coach: CoachView(store: store, plan: plan, health: health, food: food, track: track, account: account, wardrobe: wardrobe, agent: agent, sections: sections)
         }
     }
 }

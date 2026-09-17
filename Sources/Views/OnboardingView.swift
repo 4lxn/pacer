@@ -3,8 +3,9 @@ import SwiftUI
 /// First launch: wake and sleep times build a starter plan, the notification permission, then five
 /// short questions that become the Coach profile. Every step can be skipped.
 struct OnboardingView: View {
-    /// Blocks plus the day end (sleep time, clamped to the calendar day).
-    let onFinish: ([Block], DateComponents) -> Void
+    /// Blocks, the day end (sleep time, clamped to the calendar day) and the sections to show.
+    let onFinish: ([Block], DateComponents, [AppSection]) -> Void
+    @State private var picked: Set<AppSection> = Set(SectionStore.defaultEnabled)
 
     @State private var wake = Calendar.current.date(bySettingHour: 7, minute: 30, second: 0, of: .now) ?? .now
     @State private var sleep = Calendar.current.date(bySettingHour: 23, minute: 0, second: 0, of: .now) ?? .now
@@ -14,10 +15,11 @@ struct OnboardingView: View {
 
     private let calendar = Calendar.current
     private var questionCount: Int { CoachProfile.questions.count }
-    /// 0 times · 1 notifications · 2 coach intro · 3…(3+n-1) questions · last done
-    private var totalSteps: Int { 3 + questionCount + 1 }
-    private var isQuestion: Bool { step >= 3 && step < 3 + questionCount }
-    private var question: CoachProfile.Question? { isQuestion ? CoachProfile.questions[step - 3] : nil }
+    /// 0 times · 1 notifications · 2 sections · 3 coach intro · 4…(4+n-1) questions · last done
+    private static let firstQuestion = 4
+    private var totalSteps: Int { Self.firstQuestion + questionCount + 1 }
+    private var isQuestion: Bool { step >= Self.firstQuestion && step < Self.firstQuestion + questionCount }
+    private var question: CoachProfile.Question? { isQuestion ? CoachProfile.questions[step - Self.firstQuestion] : nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -29,7 +31,8 @@ struct OnboardingView: View {
                     switch step {
                     case 0: timesStep
                     case 1: notificationsStep
-                    case 2: coachIntroStep
+                    case 2: sectionsStep
+                    case 3: coachIntroStep
                     case totalSteps - 1: doneStep
                     default: questionStep
                     }
@@ -80,6 +83,30 @@ struct OnboardingView: View {
         }
     }
 
+    private var sectionsStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            title("What should Pacer run?", "Pick the parts of your day you want here. You can change this any time in Settings.")
+            VStack(spacing: 0) {
+                ForEach(AppSection.allCases.filter { !$0.isCore }) { s in
+                    Toggle(isOn: Binding(get: { picked.contains(s) }, set: { if $0 { picked.insert(s) } else { picked.remove(s) } })) {
+                        HStack(spacing: 12) {
+                            Image(systemName: s.symbol).foregroundStyle(s.tint).frame(width: 28)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(s.title)
+                                Text(s.pitch).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    if s != AppSection.allCases.last { Divider() }
+                }
+            }
+            .padding(.horizontal, 16)
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
+            primary("Next") { advance() }
+        }
+    }
+
     private var coachIntroStep: some View {
         VStack(alignment: .leading, spacing: 20) {
             title("Meet your coach", "Five short questions so it knows your goals, your training and how you eat. It can then plan meals, move blocks and answer with your numbers. You can change all of it later.")
@@ -91,7 +118,7 @@ struct OnboardingView: View {
     private var questionStep: some View {
         let q = question!
         return VStack(alignment: .leading, spacing: 16) {
-            Text("\(step - 2) of \(questionCount)").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            Text("\(step - Self.firstQuestion + 1) of \(questionCount)").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             title(q.title, q.hint)
             TextField(q.placeholder, text: binding(q.id), axis: .vertical)
                 .lineLimit(3...6)
@@ -100,7 +127,7 @@ struct OnboardingView: View {
                 .focused($answerFocused)
                 .submitLabel(.next)
                 .onSubmit { advance() }
-            primary(step == 3 + questionCount - 1 ? "Build my coach" : "Next") { advance() }
+            primary(step == Self.firstQuestion + questionCount - 1 ? "Build my coach" : "Next") { advance() }
             secondary("Skip this one") { answers[q.id] = ""; advance() }
         }
     }
@@ -150,7 +177,7 @@ struct OnboardingView: View {
     }
 
     private func advance() {
-        if step == 3 + questionCount - 1 {
+        if step == Self.firstQuestion + questionCount - 1 {
             CoachProfile.save(CoachProfile.compose(answers: answers))
             answerFocused = false
         }
@@ -162,6 +189,6 @@ struct OnboardingView: View {
         let w = calendar.dateComponents([.hour, .minute], from: wake)
         let s = calendar.dateComponents([.hour, .minute], from: sleep)
         let wake = DateComponents.hm(w.hour ?? 7, w.minute ?? 30), sleep = DateComponents.hm(s.hour ?? 23, s.minute ?? 0)
-        onFinish(Plan.starter(wake: wake, sleep: sleep), DayStore.dayEnd(fromSleep: sleep, wake: wake))
+        onFinish(Plan.starter(wake: wake, sleep: sleep), DayStore.dayEnd(fromSleep: sleep, wake: wake), SectionStore.defaultOrder.filter { picked.contains($0) || $0.isCore })
     }
 }

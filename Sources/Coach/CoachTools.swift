@@ -12,6 +12,7 @@ struct CoachTools {
     let health: HealthStore
     let track: TrackStore
     let mutator: DayMutator
+    var sections: SectionStore? = nil
     var calendar: Calendar = .current
     var now: () -> Date = { .now }
 
@@ -19,6 +20,12 @@ struct CoachTools {
         var output: String
         var summary: String?
         var isError = false
+    }
+
+    /// Definitions minus the tools of sections the user turned off.
+    var enabledDefinitions: [[String: Any]] {
+        guard let sections else { return Self.definitions }
+        return Self.definitions.filter { d in (d["name"] as? String).map(sections.allowsTool) ?? true }
     }
 
     // MARK: - Definitions

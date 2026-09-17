@@ -2,7 +2,9 @@ import Charts
 import SwiftUI
 
 struct TrackContent: View {
+    enum Part { case focus, money }
     @Bindable var track: TrackStore
+    var part: Part = .focus
     @State private var now = Date.now
     @State private var topic = ""
     @State private var focusMinutes = 25
@@ -18,9 +20,12 @@ struct TrackContent: View {
 
     var body: some View {
         List {
-            studySection
-            studyHistorySection
-            incomeSection
+            if part == .focus {
+                studySection
+                studyHistorySection
+            } else {
+                incomeSection
+            }
         }
         .onReceive(tick) { now = $0 }
         .onAppear { now = .now }
