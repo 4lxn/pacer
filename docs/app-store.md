@@ -23,24 +23,35 @@ Missed something? Five minutes after a block ends Pacer asks "did it happen?" �
 or Skip today, right from the notification. Move it later finds free time later today and shifts
 what needs shifting; one tap undoes it. Your weekly plan never changes unless you change it.
 
-Glance at the Now/Next widget to see what's on and what comes next.
+Pin your places and Pacer knows the way: travel time from Apple Maps at the hour you leave, kept
+free between blocks, with a "leave by" reminder. A calendar lets you rearrange any day ahead.
+
+See the day everywhere: widgets on the Home and Lock Screen, the current block in the Dynamic
+Island with a countdown and a Done button, and a morning brief when the day starts. Ask Siri
+"What's next in Pacer".
 
 Blocks close themselves. A run or a strength session in Apple Health (from your Garmin, Apple Watch
-or Strava) marks your training done. Twenty minutes of study marks your study block done.
+or Strava) marks your training done — even while the app is closed.
 
-Everything you track lives in one place: training week and weight trend, meals against your daily
-targets, pantry with an automatic grocery list, study timer, income, and a closet that knows what
-needs washing and suggests today's outfit.
+Pick the sections you want, in your order:
+• Train — today's session, readiness from sleep and resting heart rate, weekly goals, 8-week
+  charts, weight trend with a goal, personal bests.
+• Food — calories and macros, water, describe a meal in words or a photo and get its macros,
+  recipes that cook from your pantry, a grocery list you tap when bought.
+• Focus — a full-screen timer that lives in the Dynamic Island, subjects with weekly goals,
+  streaks and a 12-week heat map.
+• Money — income and expenses, budgets per category, savings rate, six-month trend.
+• Closet — scan your clothes, today's outfit from the weather, laundry that tracks itself.
 
-Ask the Coach. It knows your plan, your training, your food log and your goals — because you wrote
-them — and answers in your language: what's next, what to eat, how the week is going.
+Ask the Coach. It knows all of it — because you wrote it — answers in your language as it types,
+and can change anything: move a block, plan tomorrow, add to the pantry, start a focus session.
 
-Works offline. No account required. Your data stays on your iPhone.
+Works offline. No account required. Your data stays on your iPhone and can be exported any time.
 
 ## Keywords
 
-daily planner, routine, habits, time blocking, ADHD, notifications, apple health, garmin, meal
-tracker, pantry, study timer, wardrobe
+daily planner, routine, habits, time blocking, ADHD, focus timer, pomodoro, apple health, garmin,
+meal tracker, macros, budget, expenses, wardrobe, live activity, widget
 
 ## App Privacy (the questionnaire)
 
@@ -50,7 +61,8 @@ tracker, pantry, study timer, wardrobe
 | Photos | Not collected (on-device; sent to the AI only when the user scans a garment) | — | No | — |
 | User content (Coach questions, plan snapshot) | Collected when the user asks the Coach | Not linked (anonymous Apple id on the proxy only) | No | App functionality |
 | Identifiers (Sign in with Apple user id) | Collected (subscribers) | Linked | No | App functionality (rate limiting) |
-| Financial info (income entries) | Not collected (on-device only) | — | No | — |
+| Financial info (income and expenses) | Not collected (on-device only) | — | No | — |
+| Location | Not collected (used on device to pin a place; coordinates go to Apple Maps / WeatherKit only) | — | No | — |
 | Purchases | Handled by Apple | — | No | — |
 | Diagnostics | Not collected | — | No | — |
 

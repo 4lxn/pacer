@@ -8,8 +8,11 @@ screen, and bundles the trackers around your day: training week and weight, meal
 timer, income, closet with laundry and outfits, and an AI Coach that knows your plan and can change
 it. Swift 6, SwiftUI, iOS 26+ (Liquid Glass), no third-party dependencies.
 
-Tabs: **Today** (plan + editor + settings) · **Train** (Apple Health) · **Food** · **Life** (study,
-income, closet) · **Coach**. Home screen widget: Now/Next.
+Sections you toggle and order (Settings → Sections): **Today** (plan, calendar, places, settings) ·
+**Train** (Apple Health, goals, readiness, bests) · **Food** (macros, water, recipes, groceries) ·
+**Focus** (timer in the Dynamic Island, subjects, heat map) · **Money** (income, expenses, budgets)
+· **Closet** (scan, outfit from the weather, laundry) · **Coach** (streaming agent that can change
+anything). Widgets on Home and Lock Screen, Live Activities, Siri shortcuts, morning brief.
 
 The product was named Autopiloto during development; the bundle id (`com.alan.autopiloto`), scheme,
 targets and repo keep that name. Everything the user sees says Pacer. How it fits together:
