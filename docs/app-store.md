@@ -7,6 +7,7 @@
 - **Category:** Productivity (secondary: Health & Fitness)
 - **Age rating:** 4+
 - **Price:** Free; in-app subscription "Coach monthly" (`com.alan.autopiloto.coach.monthly`, group "Coach", 1-week free trial)
+- **Availability:** all territories except the EU (DSA: not a trader; no public address). Add the EU later with a business address.
 - **Privacy policy URL:** host `docs/privacy.md` (GitHub Pages, a gist, or Notion) and paste the URL
 - **Support URL:** same host, or a mailto page
 
