@@ -12,7 +12,7 @@ struct CoachView: View {
     @Bindable var agent: CoachAgent
 
     @State private var apiKey: String = APIKeyStore.load() ?? ""
-    @State private var useOwnKey = CoachClient.proxyURL == nil || APIKeyStore.load() != nil
+    @State private var useOwnKey = CoachAccount.screenshotMode == nil && (CoachClient.proxyURL == nil || APIKeyStore.load() != nil)
     @State private var editingKey = false
     @State private var keyDraft = ""
     @State private var editingProfile = false
@@ -220,13 +220,15 @@ struct CoachView: View {
                 .signInWithAppleButtonStyle(.black)
                 .frame(height: 48)
             } else if !account.isSubscribed {
-                if let product = account.product {
+                if let price = account.product?.displayPrice ?? account.previewPrice {
                     Button {
                         Task { await account.purchase() }
                     } label: {
-                        Text("Subscribe · \(product.displayPrice) / month").frame(maxWidth: .infinity)
+                        Text("Subscribe · \(price) / month").frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent).controlSize(.large)
+                    .buttonStyle(.glassProminent).controlSize(.large)
+                    Text("1-week free trial, then \(price) per month. Cancel anytime in Settings.")
+                        .font(.footnote).foregroundStyle(.secondary)
                 } else {
                     ProgressView()
                 }

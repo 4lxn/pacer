@@ -53,7 +53,7 @@ struct DayView: View {
         .onChange(of: track.sessions) { _, _ in Task { await autoCompleteFromHealth() } }
         .task(id: plan.needsOnboarding) {
             // Onboarding asks for the permission itself; don't double-prompt behind the cover.
-            guard !plan.needsOnboarding else { return }
+            guard !plan.needsOnboarding, CoachAccount.screenshotMode == nil else { return }
             let granted = await NotificationScheduler.requestAuthorization()
             notificationsDenied = !granted
             await NotificationScheduler.register(plan.blocks)
