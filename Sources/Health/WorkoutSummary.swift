@@ -17,12 +17,7 @@ struct WorkoutSummary: Identifiable, Hashable, Sendable {
     var duration: TimeInterval { end.timeIntervalSince(start) }
 }
 
-/// What closes a block automatically: a Health workout of a kind, or a study session.
-enum WorkoutMatch: String, Codable, Sendable {
-    case run
-    case strength
-    case study
-
+extension WorkoutMatch {
     func matches(_ workout: WorkoutSummary) -> Bool {
         switch self {
         case .run: workout.activity == .run
@@ -30,9 +25,6 @@ enum WorkoutMatch: String, Codable, Sendable {
         case .study: false
         }
     }
-
-    /// Minutes of study on the day needed to close a `.study` block.
-    static let studyMinutesToClose = 20
 }
 
 struct WeekTotals: Equatable {

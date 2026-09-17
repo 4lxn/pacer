@@ -17,9 +17,7 @@ final class DayStore {
     private let undoURL: URL
     private let settingsURL: URL
 
-    static var defaultDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-    }
+    static var defaultDirectory: URL { AppFiles.directory }
 
     init(directory: URL = DayStore.defaultDirectory, fallbackDayEnd: DateComponents = .hm(23, 0)) {
         overridesURL = directory.appendingPathComponent("overrides.json")

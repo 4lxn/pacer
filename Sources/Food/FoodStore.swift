@@ -56,8 +56,7 @@ final class FoodStore {
     private let calendar: Calendar
 
     static var defaultURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("food.json")
+        AppFiles.url("food.json")
     }
 
     init(fileURL: URL = FoodStore.defaultURL, calendar: Calendar = .current) {

@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import OSLog
 import UserNotifications
+import WidgetKit
 
 /// The one place that changes a day: done / skip / replan / undo. Mutations are synchronous (the
 /// stores are in-memory + JSON); the notification work they trigger is queued and awaited with
@@ -137,7 +138,10 @@ final class DayMutator {
     /// the system doesn't suspend the process mid-way.
     func flush() async { await queue?.value }
 
-    private func enqueueRearm() { enqueue { await self.rearm() } }
+    private func enqueueRearm() {
+        WidgetCenter.shared.reloadAllTimelines()
+        enqueue { await self.rearm() }
+    }
 
     private func enqueue(_ work: @escaping @MainActor () async -> Void) {
         let previous = queue

@@ -10,8 +10,7 @@ final class PlanStore {
     private let fileURL: URL
 
     static var defaultURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("plan.json")
+        AppFiles.url("plan.json")
     }
 
     init(fileURL: URL = PlanStore.defaultURL) {

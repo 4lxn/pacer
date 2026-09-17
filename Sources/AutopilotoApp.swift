@@ -1,6 +1,7 @@
 import BackgroundTasks
 import SwiftUI
 import UserNotifications
+import WidgetKit
 
 @main
 struct AutopilotoApp: App {
@@ -20,6 +21,7 @@ struct AutopilotoApp: App {
 final class AppDelegate: NSObject, UIApplicationDelegate {
     static let rearmTaskID = "com.alan.autopiloto.rearm"
 
+    private let migrated: Void = AppFiles.migrateLegacyFiles()   // before any store loads
     let store = CompletionStore()
     let plan = PlanStore()
     let health = HealthStore()
@@ -66,6 +68,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     func applicationDidEnterBackground(_ application: UIApplication) {
         Self.scheduleRearm()
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     static func scheduleRearm() {
