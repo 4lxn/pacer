@@ -4,6 +4,7 @@ import SwiftUI
 struct TrainView: View {
     @Bindable var health: HealthStore
     let mutator: DayMutator
+    var agent: CoachAgent? = nil
     @State private var weightDraft = ""
     @State private var now = Date.now
     @State private var weightRange = 30
@@ -47,6 +48,7 @@ struct TrainView: View {
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Train")
+            .toolbar { if let agent { ToolbarItem(placement: .topBarTrailing) { Button { agent.queued = "How is my training week going, and what should I do next?" } label: { Label("Ask the coach", systemImage: "sparkles") } } } }
             .refreshable { await reload() }
             .task { await reload() }
             .sheet(isPresented: $editingGoals) { TrainGoalsForm(runs: $goalRuns, lifts: $goalLifts, minutes: $goalMinutes) }

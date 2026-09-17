@@ -39,7 +39,7 @@ final class CheckInTests: XCTestCase {
             plan: { _ in Plan.blocks }, now: now,
             completed: { $0 == "2026-09-16" ? ["b09"] : [] },
             skipped: { $0 == "2026-09-17" ? ["b17"] : [] },
-            calendar: calendar
+            brief: false, calendar: calendar
         )
         let ids = requests.map(\.identifier)
         // Today: morning ones are past, lunch is done → b14 b16 b17. Tomorrow: all 7 minus skipped b17.
@@ -68,7 +68,7 @@ final class CheckInTests: XCTestCase {
             calendar: calendar, center: fake.client
         )
         XCTAssertEqual(fake.removed, ["checkin-old-2026-09-15"])
-        XCTAssertEqual(added, 11)   // today b09 b14 b16 b17 + all 7 tomorrow
+        XCTAssertEqual(added, 12)   // today b09 b14 b16 b17 + all 7 tomorrow + tomorrow's brief
         XCTAssertTrue(fake.pending.contains("b13-snooze"))
         XCTAssertEqual(fake.pending.filter { $0.hasPrefix("b") && $0.contains("-wd") }.count, 30)
         XCTAssertLessThanOrEqual(fake.pending.count, NotificationScheduler.maxPending)
@@ -137,5 +137,24 @@ final class CheckInTests: XCTestCase {
             XCTAssertFalse(labels.contains(word), word)
         }
         XCTAssertFalse(CoachProfile.template.lowercased().contains("alan"))
+    }
+}
+
+final class MorningBriefTests: XCTestCase {
+    func testBriefSummarisesTheDayAtFirstBlockEnd() {
+        var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "America/Mexico_City")!
+        let day = c.date(from: DateComponents(year: 2026, month: 9, day: 17, hour: 6))!
+        let blocks = [
+            Block(id: "w", label: "Wake up", kind: .fixed, start: .hm(7, 30), end: .hm(7, 40), isAnchor: true),
+            Block(id: "o", label: "Work", kind: .fixed, start: .hm(10, 0), end: .hm(17, 0), place: "office"),
+            Block(id: "g", label: "Gym", kind: .window, start: .hm(19, 15), end: .hm(20, 15), autoComplete: .strength, weekdayNotes: [5: "Arms"]),
+        ]
+        let r = NotificationScheduler.briefRequest(for: blocks, day: day, dayKey: "2026-09-17", now: day, legs: ["o": (30, "Home")], moved: ["g"], calendar: c)!
+        XCTAssertEqual(r.1.identifier, "brief-2026-09-17")
+        XCTAssertEqual(r.1.content.title, "Your Thursday")
+        XCTAssertEqual(r.1.content.body, "3 blocks · Gym 19:15 (Arms) · leave for Work by 09:30 · moved: Gym")
+        XCTAssertEqual((r.1.trigger as! UNCalendarNotificationTrigger).dateComponents.hour, 7)
+        XCTAssertEqual((r.1.trigger as! UNCalendarNotificationTrigger).dateComponents.minute, 40)
+        XCTAssertNil(NotificationScheduler.briefRequest(for: blocks, day: day, dayKey: "x", now: day.addingTimeInterval(3 * 3600), legs: [:], moved: [], calendar: c))
     }
 }

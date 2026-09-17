@@ -4,6 +4,7 @@ import SwiftUI
 /// Focus: start a session, watch it in the Dynamic Island, keep subjects and streaks.
 struct FocusContent: View {
     @Bindable var track: TrackStore
+    var agent: CoachAgent? = nil
     @State private var now = Date.now
     @State private var subjectName = ""
     @State private var focusMinutes = 25
@@ -37,6 +38,7 @@ struct FocusContent: View {
             if CoachAccount.screenshotMode == "focus-timer", !track.isStudying { start() }
             #endif
         }
+        .toolbar { if let agent { ToolbarItem(placement: .topBarTrailing) { Button { agent.queued = "How is my focus going this week, and what should I work on next?" } label: { Label("Ask the coach", systemImage: "sparkles") } } } }
         .fullScreenCover(isPresented: $showTimer) { FocusTimerView(track: track) }
         .sheet(item: $editingSubject) { s in SubjectForm(subject: s) { track.upsertSubject($0) } onDelete: { track.deleteSubject(id: $0) } }
         .sheet(isPresented: $addingSubject) { SubjectForm(subject: Subject(name: subjectName.isEmpty ? "" : subjectName), isNew: true) { track.upsertSubject($0) } onDelete: { _ in } }

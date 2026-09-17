@@ -4,6 +4,7 @@ import SwiftUI
 /// Money: what came in, what went out, what stayed.
 struct MoneyContent: View {
     @Bindable var track: TrackStore
+    var agent: CoachAgent? = nil
     @State private var now = Date.now
     @State private var addingExpense = false
     @State private var addingIncome = false
@@ -31,6 +32,7 @@ struct MoneyContent: View {
         .onAppear { now = .now }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                if let agent { Button { agent.queued = "Where did my money go this month, and what should I watch?" } label: { Label("Ask the coach", systemImage: "sparkles") } }
                 Button { addingIncome = true } label: { Label("Add income", systemImage: "plus.circle") }
                 Button { addingExpense = true } label: { Label("Add expense", systemImage: "minus.circle") }
             }

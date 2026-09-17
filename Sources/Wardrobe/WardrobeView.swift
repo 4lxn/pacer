@@ -5,6 +5,8 @@ import UIKit
 struct WardrobeView: View {
     @Bindable var wardrobe: WardrobeStore
     @Bindable var account: CoachAccount
+    var home: Place? = nil
+    @State private var weather = WeatherNow()
     @State private var now = Date.now
     @State private var pickedItems: [PhotosPickerItem] = []
     @State private var showCamera = false
@@ -27,6 +29,11 @@ struct WardrobeView: View {
             closetSection
         }
         .onAppear { now = .now }
+        .task(id: home?.id) {
+            guard let home, let la = home.latitude, let lo = home.longitude else { return }
+            await weather.refresh(latitude: la, longitude: lo)
+            if let s = weather.summary, wardrobe.weather != s.bucket { wardrobe.weather = s.bucket }
+        }
         .toolbar {
             Menu {
                 if UIImagePickerController.isSourceTypeAvailable(.camera) {
@@ -74,6 +81,11 @@ struct WardrobeView: View {
 
     private var outfitSection: some View {
         Section {
+            if let s = weather.summary {
+                Label(s.line, systemImage: s.symbol).font(.subheadline).foregroundStyle(.secondary)
+            } else if home?.isPinned != true {
+                Text("Pin Home in Settings → Places to get today's weather here.").font(.caption).foregroundStyle(.secondary)
+            }
             Picker("Weather", selection: $wardrobe.weather) {
                 ForEach(Weather.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
             }

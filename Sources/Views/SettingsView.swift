@@ -55,6 +55,7 @@ struct SettingsView: View {
                     }
                     Button("Play the chime", systemImage: "speaker.wave.2") { SoundPreview.play() }
                     Toggle("Live Activity for the current block", isOn: $days.liveActivity)
+                    Toggle("Morning brief", isOn: $days.morningBrief)
                     if notificationStatus == .denied {
                         Button("Open iOS Settings") { open(URL(string: UIApplication.openSettingsURLString)) }
                     }

@@ -4,22 +4,25 @@ import SwiftUI
 /// section's title.
 struct FocusTab: View {
     @Bindable var track: TrackStore
+    var agent: CoachAgent? = nil
     var body: some View {
-        NavigationStack { FocusContent(track: track).navigationTitle("Focus") }
+        NavigationStack { FocusContent(track: track, agent: agent).navigationTitle("Focus") }
     }
 }
 
 struct MoneyTab: View {
     @Bindable var track: TrackStore
+    var agent: CoachAgent? = nil
     var body: some View {
-        NavigationStack { MoneyContent(track: track).navigationTitle("Money") }
+        NavigationStack { MoneyContent(track: track, agent: agent).navigationTitle("Money") }
     }
 }
 
 struct ClosetTab: View {
     @Bindable var wardrobe: WardrobeStore
     @Bindable var account: CoachAccount
+    var home: Place? = nil
     var body: some View {
-        NavigationStack { WardrobeView(wardrobe: wardrobe, account: account).navigationTitle("Closet") }
+        NavigationStack { WardrobeView(wardrobe: wardrobe, account: account, home: home).navigationTitle("Closet") }
     }
 }

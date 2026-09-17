@@ -12,6 +12,7 @@ Pacer (bundle id com.alan.autopiloto) is a personal day planner. It is built so 
   mark blocks done. The weight you log is written to Apple Health. Health data never leaves your
   device and is never sent to us or to any third party.
 - **Places** you pin are looked up with Apple Maps on your device (search and travel-time estimates go to Apple's MapKit service under Apple's privacy policy). Your location is read only when you tap "Use my current location", and never tracked.
+- **Weather** for the Closet comes from Apple WeatherKit using the coordinates of the Home place you pinned; nothing else is sent. (Data provided by  Weather.)
 - **Notifications** are scheduled locally on your device.
 
 ## The Coach (optional)

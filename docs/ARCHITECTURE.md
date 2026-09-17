@@ -47,6 +47,7 @@ plan.json (weekly template)      overrides.json (today's moves)
 | Check-in | `checkin-<blockId>-<dayKey>` | end + 5 min, today + tomorrow | `CHECK_IN`: Done, Move it later, Skip today |
 | Moved start | `moved-<blockId>-<dayKey>` | new start, one-shot | `BLOCK_ACTIONS` |
 | Leave | `leave-<blockId>-<dayKey>` | start − travel, one-shot | — |
+| Morning brief | `brief-<dayKey>` | first block's end, one-shot | — |
 | Replan result | `replan-<uuid>` | immediate (only from a notification action) | `REPLAN_UNDO`: Undo |
 
 Repeating starts survive force-quit; one-shots are re-armed after every mutation, on foreground, by
@@ -78,6 +79,14 @@ on the main actor against the stores — including `move_today` / `skip_today` /
 `DayMutator`. The system prompt = profile (cached) + `CoachContext.snapshot` over the effective plan.
 Requests go to `server/` (Railway: Sign in with Apple → session token, StoreKit subscription, daily
 limit) or directly with the user's own key.
+
+## Sections
+
+`AppSection` is the registry (title, symbol, tint, pitch, coach tool prefixes); `SectionStore` keeps the enabled list + order in `sections.json`. `RootView` renders tabs from it; Settings → Sections toggles/reorders; the coach filters tools and snapshot by what's on. Each section is one file pair (store + view): Train (`HealthStore`/`TrainView`), Food, Focus + Money (`TrackStore`, `FocusView`, `MoneyView`), Closet (`WardrobeStore`/`WardrobeView` + `WeatherNow` via WeatherKit).
+
+## Siri / Shortcuts
+
+`Sources/Intents/PacerIntents.swift`: What's next, Mark done, Move later, Start/Stop focus, Log water, Log weight; they reach the live stores through `AppDelegate.shared`.
 
 ## Targets
 
