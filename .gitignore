@@ -5,3 +5,6 @@ DerivedData/
 build/
 *.xcresult
 .DS_Store
+
+# Archives
+build/

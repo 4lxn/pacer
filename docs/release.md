@@ -9,14 +9,14 @@ xcodebuild -scheme Autopiloto -destination 'platform=iOS Simulator,name=iPhone 1
 
 ## TestFlight / App Store upload
 
-1. In `project.yml` set `DEVELOPMENT_TEAM` (or pick the team once in Xcode) and bump the version.
-2. Archive and export with automatic signing. With an App Store Connect API key
-   (Issuer ID, Key ID, `.p8` in `~/.appstoreconnect/private_keys/`):
+1. `DEVELOPMENT_TEAM` is set in `project.yml` (UK3KUGFP25). Bump `CURRENT_PROJECT_VERSION`
+   per upload (or rely on `manageAppVersionAndBuildNumber` in ExportOptions, which auto-bumps).
+2. Archive and export with automatic signing. Xcode's signed-in Apple ID is enough
+   (`-allowProvisioningUpdates`); an App Store Connect API key is only needed on CI:
 
 ```sh
 xcodebuild -scheme Autopiloto -destination 'generic/platform=iOS' -archivePath build/Autopiloto.xcarchive archive \
-  -allowProvisioningUpdates -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8 \
-  -authenticationKeyID <KEYID> -authenticationKeyIssuerID <ISSUER>
+  -allowProvisioningUpdates
 
 cat > build/ExportOptions.plist <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -25,12 +25,15 @@ cat > build/ExportOptions.plist <<'PLIST'
   <key>method</key><string>app-store-connect</string>
   <key>destination</key><string>upload</string>
   <key>signingStyle</key><string>automatic</string>
+  <key>teamID</key><string>UK3KUGFP25</string>
+  <key>uploadSymbols</key><true/>
+  <key>manageAppVersionAndBuildNumber</key><true/>
 </dict></plist>
 PLIST
 
 xcodebuild -exportArchive -archivePath build/Autopiloto.xcarchive -exportOptionsPlist build/ExportOptions.plist \
-  -exportPath build/export -allowProvisioningUpdates \
-  -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8 -authenticationKeyID <KEYID> -authenticationKeyIssuerID <ISSUER>
+  -exportPath build/export -allowProvisioningUpdates
+# First upload done 2026-09-16 (build 1.0 (1)) exactly this way.
 ```
 
 Or: Xcode → Product → Archive → Distribute App → App Store Connect → Upload.

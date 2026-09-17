@@ -13,7 +13,7 @@ settings:
     GCC_TREAT_WARNINGS_AS_ERRORS: YES
     CODE_SIGN_STYLE: Automatic
     # Set your Apple Developer Team ID here (or pick the team in Xcode > Signing & Capabilities).
-    DEVELOPMENT_TEAM: ""
+    DEVELOPMENT_TEAM: UK3KUGFP25
 targets:
   Autopiloto:
     type: application
