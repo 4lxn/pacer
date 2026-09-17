@@ -176,7 +176,7 @@ struct CoachTools {
             let override = mutator.days.override(dayKey: dayKey)
             let extras = Set(override.extras.map(\.id))
             let places = mutator.days.places
-            let legs = DayLogic.travelLegs(blocks, places: places)
+            let legs = DayLogic.travelLegs(blocks, places: places, overrides: mutator.days.legMinutes(dayKey: dayKey))
             let lines = blocks.map { b -> String in
                 let time = b.start.map { NotificationScheduler.clock($0) + "–" + NotificationScheduler.clock(b.end ?? $0) } ?? "anytime"
                 let status = b.status(now: clock, completed: completed, skipped: skipped, calendar: calendar)

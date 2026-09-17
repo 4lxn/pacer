@@ -142,7 +142,7 @@ struct DayPlanView: View {
     private var blocks: [Block] { DayLogic.sorted(mutator.effectivePlan(on: date)) }
     private var override: DayOverride { mutator.days.override(dayKey: dayKey) }
     private var isToday: Bool { calendar.isDate(date, inSameDayAs: now) }
-    private var legs: [String: (minutes: Int, from: String)] { DayLogic.travelLegs(blocks, places: mutator.days.places) }
+    private var legs: [String: (minutes: Int, from: String)] { DayLogic.travelLegs(blocks, places: mutator.days.places, overrides: mutator.days.legMinutes(dayKey: dayKey)) }
 
     var body: some View {
         List {
