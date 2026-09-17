@@ -270,6 +270,7 @@ final class ChatHistoryTests: XCTestCase {
     }
 }
 
+@MainActor
 final class ToolCapTests: XCTestCase {
     /// The proxy refuses requests with more than 80 tools (server/src/index.mjs); every section on must fit.
     func testAllToolsFitUnderTheProxyCap() {
