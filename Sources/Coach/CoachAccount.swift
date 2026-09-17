@@ -14,12 +14,29 @@ final class CoachAccount {
     private(set) var isSubscribed = false
     private(set) var product: Product?
     private(set) var lastError: String?
+    /// Debug-only: `AUTOPILOTO_SCREENSHOT=paywall` shows the subscribe screen without StoreKit
+    /// (App Store review screenshots are taken from the simulator via `simctl`, which cannot
+    /// attach the .storekit configuration).
+    static let screenshotMode = ProcessInfo.processInfo.environment["AUTOPILOTO_SCREENSHOT"]
+    var previewPrice: String? {
+        #if DEBUG
+        Self.screenshotMode == "paywall" && product == nil ? "$4.99" : nil
+        #else
+        nil
+        #endif
+    }
 
     var isSignedIn: Bool { sessionToken != nil }
 
     private var updates: Task<Void, Never>?
 
     init() {
+        #if DEBUG
+        if Self.screenshotMode == "paywall" {
+            sessionToken = "preview"
+            isSubscribed = false
+        }
+        #endif
         updates = Task { [weak self] in
             for await result in Transaction.updates {
                 if case .verified(let t) = result { await t.finish() }

@@ -69,7 +69,18 @@ Coach requests. Encryption: the app uses only HTTPS (ITSAppUsesNonExemptEncrypti
 
 ## Screenshots (6.9" and 6.5" required)
 
-Take in the simulator with ⌘S: Today (a current block highlighted), Train (workouts + weight chart),
+Debug builds honour two launch env vars for screenshots without tapping: `AUTOPILOTO_TAB`
+(`today|train|food|life|coach`) and `AUTOPILOTO_SCREENSHOT=paywall` (Coach subscribe screen with
+the fallback price, no notification prompt). From a terminal:
+
+```sh
+SIMCTL_CHILD_AUTOPILOTO_TAB=coach SIMCTL_CHILD_AUTOPILOTO_SCREENSHOT=paywall \
+  xcrun simctl launch <sim-udid> com.alan.autopiloto && xcrun simctl io <sim-udid> screenshot paywall.png
+```
+
+The subscription's Review Information screenshot lives at `docs/screenshots/coach-paywall-review.png`.
+
+Take the rest in the simulator with ⌘S: Today (a current block highlighted), Train (workouts + weight chart),
 Food (macros + pantry), Life → Closet (outfit + laundry), Coach (an answer), Plan editor.
 
 ## Before the first public build
