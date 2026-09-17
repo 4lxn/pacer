@@ -187,7 +187,8 @@ final class DayMutator {
                 let o = days.override(dayKey: key)
                 return Set(o.moved.keys).union(o.extras.map(\.id))
             },
-            checkIns: days.checkInsEnabled, places: days.places, calendar: calendar, center: center
+            checkIns: days.checkInsEnabled, places: days.places, legOverrides: { [self] in days.legMinutes(dayKey: $0) },
+            calendar: calendar, center: center
         )
         metrics.markRearm(now())
         await syncLiveActivity()

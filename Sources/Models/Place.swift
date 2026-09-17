@@ -107,16 +107,29 @@ extension Places {
 extension DayLogic {
     /// For consecutive timed blocks, the travel needed before each one: (block id → minutes,
     /// from place name). Zero-minute legs are omitted.
-    static func travelLegs(_ blocks: [Block], places: Places) -> [String: (minutes: Int, from: String)] {
+    static func travelLegs(_ blocks: [Block], places: Places, overrides: [String: Int] = [:]) -> [String: (minutes: Int, from: String)] {
         var legs: [String: (Int, String)] = [:]
         var lastPlace: String? = Place.homeID
         for b in sorted(blocks) where b.start != nil {
             let here = b.place ?? lastPlace
-            let minutes = places.minutes(from: lastPlace, to: here)
+            let matrix = places.minutes(from: lastPlace, to: here)
+            let minutes = matrix > 0 ? (overrides[b.id] ?? matrix) : 0
             if minutes > 0 { legs[b.id] = (minutes, places.name(id: lastPlace) ?? "") }
             lastPlace = here
         }
         return legs
+    }
+
+    /// The legs with their from/to place ids, for the Maps refresh.
+    static func travelPairs(_ blocks: [Block], places: Places) -> [(block: Block, from: String, to: String)] {
+        var out: [(Block, String, String)] = []
+        var lastPlace: String? = Place.homeID
+        for b in sorted(blocks) where b.start != nil {
+            let here = b.place ?? lastPlace
+            if let from = lastPlace, let to = here, from != to, places.minutes(from: from, to: to) > 0 { out.append((b, from, to)) }
+            lastPlace = here
+        }
+        return out
     }
 }
 

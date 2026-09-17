@@ -96,3 +96,19 @@ final class PlacesMapsTests: XCTestCase {
         XCTAssertEqual(decoded?.list.first?.isPinned, false)
     }
 }
+
+final class LegOverrideTests: XCTestCase {
+    func testMapsLegsOverrideTheMatrixOnlyWhereALegExists() {
+        var p = Places()
+        p.upsert(Place(id: "office", name: "Office"))
+        p.setTravel("home", "office", minutes: 30)
+        let blocks = [
+            Block(id: "w", label: "Wake", kind: .fixed, start: .hm(7, 0), end: .hm(7, 10), isAnchor: true),
+            Block(id: "o", label: "Work", kind: .fixed, start: .hm(10, 0), end: .hm(17, 0), place: "office"),
+        ]
+        let legs = DayLogic.travelLegs(blocks, places: p, overrides: ["o": 45, "w": 99])
+        XCTAssertEqual(legs["o"]?.minutes, 45)   // rush-hour ETA wins
+        XCTAssertNil(legs["w"])                   // no leg → no override
+        XCTAssertEqual(DayLogic.travelPairs(blocks, places: p).map { ($0.block.id, $0.from, $0.to) }.first.map { "\($0.0)|\($0.1)|\($0.2)" }, "o|home|office")
+    }
+}

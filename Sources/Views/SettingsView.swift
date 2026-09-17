@@ -91,7 +91,7 @@ struct SettingsView: View {
             .navigationDestination(isPresented: $showPlaces) { PlacesView(days: days) }
             .onAppear {
                 #if DEBUG
-                if CoachAccount.screenshotMode == "places" { showPlaces = true }
+                if CoachAccount.screenshotMode == "places" || CoachAccount.screenshotMode == "placeform" { showPlaces = true }
                 #endif
             }
             .onChange(of: days.sound) { _, sound in

@@ -18,6 +18,9 @@ final class DayStore {
     var sound = "pacer" { didSet { saveSettings() } }
     /// Places and travel times between them (`places.json`).
     var places = Places() { didSet { JSONFile.save(places, to: placesURL) } }
+    /// Maps ETAs for specific legs, keyed by dayKey then block id (`legs.json`); refreshed with the
+    /// block's departure time so traffic at that hour counts. Overrides the flat matrix.
+    private(set) var legs: [String: [String: Int]] = [:]
 
     private struct Settings: Codable {
         var dayEnd: DateComponents
@@ -30,6 +33,7 @@ final class DayStore {
     private let undoURL: URL
     private let settingsURL: URL
     private let placesURL: URL
+    private let legsURL: URL
 
     static var defaultDirectory: URL { AppFiles.directory }
 
@@ -38,7 +42,9 @@ final class DayStore {
         undoURL = directory.appendingPathComponent("undo.json")
         settingsURL = directory.appendingPathComponent("settings.json")
         placesURL = directory.appendingPathComponent("places.json")
+        legsURL = directory.appendingPathComponent("legs.json")
         if case .loaded(let p) = JSONFile.load(Places.self, from: placesURL) { places = p }
+        if case .loaded(let l) = JSONFile.load([String: [String: Int]].self, from: legsURL) { legs = l }
         if case .loaded(let o) = JSONFile.load([String: DayOverride].self, from: overridesURL) { overrides = o }
         if case .loaded(let u) = JSONFile.load(UndoRecord.self, from: undoURL) { undo = u }
         if case .loaded(let s) = JSONFile.load(Settings.self, from: settingsURL) {
@@ -59,6 +65,15 @@ final class DayStore {
         if override.isEmpty { overrides.removeValue(forKey: dayKey) } else { overrides[dayKey] = override }
         // Keep the file small: drop days older than yesterday.
         JSONFile.save(overrides, to: overridesURL)
+    }
+
+    func legMinutes(dayKey: String) -> [String: Int] { legs[dayKey] ?? [:] }
+
+    /// Replaces a day's Maps legs and drops days before `keep`.
+    func setLegs(_ minutes: [String: Int], dayKey: String, keepFrom keep: String) {
+        legs[dayKey] = minutes
+        legs = legs.filter { $0.key >= keep }
+        JSONFile.save(legs, to: legsURL)
     }
 
     func setNote(_ note: String, blockID: String, dayKey: String) {

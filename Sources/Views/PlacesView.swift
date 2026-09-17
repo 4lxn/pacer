@@ -80,7 +80,7 @@ struct PlacesView: View {
         }
         .navigationTitle("Places & travel").navigationBarTitleDisplayMode(.inline)
         .sheet(item: $editing) { place in
-            PlaceForm(place: place) { saved in
+            PlaceForm(place: place, near: places) { saved in
                 let wasPinned = days.places.place(id: saved.id)?.isPinned ?? false
                 days.places.upsert(saved)
                 if saved.isPinned && !wasPinned { Task { await TravelEstimator.estimateAll(days) } }
@@ -90,6 +90,7 @@ struct PlacesView: View {
         .onAppear {
             #if DEBUG
             if CoachAccount.screenshotMode == "places" { Task { estimating = true; estimated = await TravelEstimator.estimateAll(days); estimating = false } }
+            if CoachAccount.screenshotMode == "placeform" { editing = Place(name: "Office") }
             #endif
         }
     }
@@ -114,6 +115,7 @@ struct PlacesView: View {
 
 struct PlaceForm: View {
     @State var place: Place
+    var near: [Place] = []   // pinned places, to bias the search
     let onSave: (Place) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var search = PlaceSearch()
@@ -134,15 +136,22 @@ struct PlaceForm: View {
                     TextField("Name", text: $place.name)
                 }
                 Section {
-                    TextField("Search Apple Maps (address or name)", text: $query).focused($searchFocused)
-                        .onChange(of: query) { _, q in search.update(q) }
-                    ForEach(search.results, id: \.self) { r in
-                        Button {
-                            Task { await pick(r) }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(r.title).foregroundStyle(Color.primary)
-                                Text(r.subtitle).font(.caption).foregroundStyle(.secondary)
+                    HStack {
+                        TextField("Search Apple Maps (address or name)", text: $query).focused($searchFocused)
+                            .textInputAutocapitalization(.words).autocorrectionDisabled()
+                            .onChange(of: query) { _, q in search.update(q) }
+                            .onSubmit { search.update(query) }
+                        if search.searching { ProgressView() }
+                    }
+                    if let error = search.lastError, !search.searching { Text(error).font(.caption).foregroundStyle(.secondary) }
+                    ForEach(search.results) { hit in
+                        Button { pick(hit) } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "mappin").foregroundStyle(Color.accentColor)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(hit.name).foregroundStyle(Color.primary)
+                                    if !hit.address.isEmpty && hit.address != hit.name { Text(hit.address).font(.caption).foregroundStyle(Color.secondary) }
+                                }
                             }
                         }
                     }
@@ -181,13 +190,19 @@ struct PlaceForm: View {
             .onAppear {
                 if let coordinate { position = .region(MKCoordinateRegion(center: coordinate, latitudinalMeters: 800, longitudinalMeters: 800)) }
                 else { searchFocused = true }
+                if let anchor = coordinate ?? near.first(where: \.isPinned).flatMap({ p in p.latitude.flatMap { la in p.longitude.map { CLLocationCoordinate2D(latitude: la, longitude: $0) } } }) {
+                    search.region = MKCoordinateRegion(center: anchor, latitudinalMeters: 60_000, longitudinalMeters: 60_000)
+                }
+                #if DEBUG
+                if CoachAccount.screenshotMode == "placeform" { query = "Reforma 222"; search.update(query) }
+                #endif
             }
         }
     }
 
-    private func pick(_ completion: MKLocalSearchCompletion) async {
-        guard let (coord, address) = await search.resolve(completion) else { return }
-        set(coord, address: address)
+    private func pick(_ hit: PlaceSearch.Hit) {
+        set(hit.coordinate, address: hit.address.isEmpty ? hit.name : hit.address)
+        if place.name.trimmingCharacters(in: .whitespaces).isEmpty { place.name = hit.name }
         query = ""; search.update("")
         searchFocused = false
     }

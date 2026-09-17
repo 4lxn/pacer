@@ -30,7 +30,7 @@ struct DayView: View {
     private var blocks: [Block] { DayLogic.sorted(mutator.effectivePlan(on: now)) }
     private var moved: Set<String> { Set(days.override(dayKey: mutator.dayKey(now)).moved.keys) }
     private var dayNotes: [String: String] { days.override(dayKey: mutator.dayKey(now)).notes }
-    private var legs: [String: (minutes: Int, from: String)] { DayLogic.travelLegs(blocks, places: days.places) }
+    private var legs: [String: (minutes: Int, from: String)] { DayLogic.travelLegs(blocks, places: days.places, overrides: days.legMinutes(dayKey: mutator.dayKey(now))) }
     private var completed: Set<String> { store.completed(on: now) }
     private var skipped: Set<String> { store.skipped(on: now) }
     /// Skipped blocks leave the denominator: "n / N today" counts what is still on the plan.
@@ -113,13 +113,14 @@ struct DayView: View {
                     await refreshNotifications()
                     await autoCompleteFromHealth()
                     await rearmCheckIns()
+                    await TravelEstimator.refreshLegs(mutator)
                 }
             }
         }
         .sheet(isPresented: $editingPlan) { PlanView(plan: plan, places: days.places.list) }
         .onAppear {
             #if DEBUG
-            if CoachAccount.screenshotMode == "settings" || CoachAccount.screenshotMode == "places" { showingSettings = true }
+            if ["settings", "places", "placeform"].contains(CoachAccount.screenshotMode ?? "") { showingSettings = true }
             if CoachAccount.screenshotMode == "detail" { detail = current ?? blocks.first }
             if CoachAccount.screenshotMode == "days" { showingDays = true }
             if CoachAccount.screenshotMode == "tomorrow" { openDay = calendar.date(byAdding: .day, value: 1, to: now) }
@@ -135,7 +136,9 @@ struct DayView: View {
             await NotificationScheduler.register(plan.blocks)
             await autoCompleteFromHealth()
             await rearmCheckIns()
+            await TravelEstimator.refreshLegs(mutator)
         }
+        .onChange(of: moved) { _, _ in Task { await TravelEstimator.refreshLegs(mutator) } }
     }
 
     /// "8 / 21 done" with a bar that fills as the day goes; visible progress is the point.

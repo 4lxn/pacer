@@ -111,6 +111,7 @@ enum NotificationScheduler {
         movedIDs: (String) -> Set<String> = { _ in [] },
         checkIns: Bool = true,
         places: Places = Places(),
+        legOverrides: (String) -> [String: Int] = { _ in [:] },
         calendar: Calendar = .current
     ) -> [UNNotificationRequest] {
         var requests: [(Date, UNNotificationRequest)] = []
@@ -119,7 +120,7 @@ enum NotificationScheduler {
             let dayKey = DayLogic.dayKey(day, calendar: calendar)
             let done = completed(dayKey), skip = skipped(dayKey), moved = movedIDs(dayKey)
             let dayPlan = plan(day)
-            let legs = DayLogic.travelLegs(dayPlan.filter { $0.occurs(on: day, calendar: calendar) }, places: places)
+            let legs = DayLogic.travelLegs(dayPlan.filter { $0.occurs(on: day, calendar: calendar) }, places: places, overrides: legOverrides(dayKey))
             for block in dayPlan where block.occurs(on: day, calendar: calendar) {
                 guard !done.contains(block.id), !skip.contains(block.id) else { continue }
                 if let leg = legs[block.id], let start = block.startDate(on: day, calendar: calendar),
@@ -172,6 +173,7 @@ enum NotificationScheduler {
         movedIDs: (String) -> Set<String> = { _ in [] },
         checkIns: Bool = true,
         places: Places = Places(),
+        legOverrides: (String) -> [String: Int] = { _ in [:] },
         calendar: Calendar = .current,
         center: NotificationCenterClient = .live
     ) async -> Int {
@@ -179,7 +181,7 @@ enum NotificationScheduler {
         let stale = pending.filter(isOneShot)
         center.removePending(stale)
         let room = max(0, maxPending - (pending.count - stale.count))
-        let wanted = buildCheckIns(plan: plan, now: now, completed: completed, skipped: skipped, movedIDs: movedIDs, checkIns: checkIns, places: places, calendar: calendar)
+        let wanted = buildCheckIns(plan: plan, now: now, completed: completed, skipped: skipped, movedIDs: movedIDs, checkIns: checkIns, places: places, legOverrides: legOverrides, calendar: calendar)
         if wanted.count > room {
             log.warning("\(wanted.count) check-ins wanted, room for \(room); dropping the latest ones")
         }
