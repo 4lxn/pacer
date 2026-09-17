@@ -24,7 +24,29 @@ struct CoachView: View {
     @Namespace private var glass
 
     private let calendar = Calendar.current
-    private let suggestions = ["What's next?", "What should I have for dinner?", "What do I need to buy?", "Add 1 kg of rice", "Move study to 5 pm", "What should I wear?"]
+    /// Chips that fit the moment: missed blocks, an empty pantry, an evening, a section that's on.
+    private var suggestions: [String] {
+        let now = Date.now
+        let mutator = agent.tools.mutator
+        let key = mutator.dayKey(now)
+        let blocks = mutator.effectivePlan(on: now)
+        let missed = blocks.filter { $0.status(now: now, completed: store.completed(dayKey: key), skipped: store.skipped(dayKey: key)) == .missed }
+        let hour = calendar.component(.hour, from: now)
+        var out: [String] = []
+        if !missed.isEmpty { out.append(missed.count == 1 ? "I missed \(missed[0].label) — fix my day" : "I missed \(missed.count) blocks — replan my day") }
+        out.append(hour < 12 ? "What's my day like?" : "What's next?")
+        if hour >= 17 { out.append("Plan tomorrow with the gym early") } else { out.append("Move study to 5 pm today") }
+        if sections.isOn(.food) {
+            out.append(hour >= 16 ? "What should I have for dinner?" : "What should I eat next?")
+            if !food.groceryList.isEmpty { out.append("What do I need to buy?") }
+        }
+        if sections.isOn(.train) { out.append("How's my training week going?") }
+        if sections.isOn(.focus) { out.append("Start a 25-minute focus on \(track.subjects.first?.name ?? "my main subject")") }
+        if sections.isOn(.money) { out.append("Where did my money go this month?") }
+        if sections.isOn(.closet) { out.append("What should I wear?") }
+        out.append("Remember that I train fasted on run days")
+        return Array(out.prefix(7))
+    }
 
     private var canAsk: Bool {
         #if DEBUG

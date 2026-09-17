@@ -14,6 +14,8 @@ final class DayStore {
     var checkInsEnabled = true { didSet { saveSettings() } }
     /// Dynamic Island / Lock Screen Live Activity for the block that's on.
     var liveActivity = true { didSet { saveSettings() } }
+    /// One notification when the first block ends: the day in one line.
+    var morningBrief = true { didSet { saveSettings() } }
     /// "pacer" (the bundled chime) or "system".
     var sound = "pacer" { didSet { saveSettings() } }
     /// Places and travel times between them (`places.json`).
@@ -27,6 +29,7 @@ final class DayStore {
         var checkInsEnabled: Bool?
         var sound: String?
         var liveActivity: Bool?
+        var morningBrief: Bool?
     }
 
     private let overridesURL: URL
@@ -52,12 +55,13 @@ final class DayStore {
             checkInsEnabled = s.checkInsEnabled ?? true
             sound = s.sound ?? "pacer"
             liveActivity = s.liveActivity ?? true
+            morningBrief = s.morningBrief ?? true
         } else {
             dayEnd = fallbackDayEnd
         }
     }
 
-    private func saveSettings() { JSONFile.save(Settings(dayEnd: dayEnd, checkInsEnabled: checkInsEnabled, sound: sound, liveActivity: liveActivity), to: settingsURL) }
+    private func saveSettings() { JSONFile.save(Settings(dayEnd: dayEnd, checkInsEnabled: checkInsEnabled, sound: sound, liveActivity: liveActivity, morningBrief: morningBrief), to: settingsURL) }
 
     func override(dayKey: String) -> DayOverride { overrides[dayKey] ?? DayOverride() }
 

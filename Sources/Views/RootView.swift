@@ -71,11 +71,11 @@ struct RootView: View {
     private func view(for section: AppSection) -> some View {
         switch section {
         case .today: DayView(store: store, plan: plan, days: days, mutator: mutator, metrics: metrics, health: health, track: track, account: account, sections: sections)
-        case .train: TrainView(health: health, mutator: mutator)
+        case .train: TrainView(health: health, mutator: mutator, agent: sections.isOn(.coach) ? agent : nil)
         case .food: FoodView(food: food, account: account, agent: agent)
-        case .focus: FocusTab(track: track)
-        case .money: MoneyTab(track: track)
-        case .closet: ClosetTab(wardrobe: wardrobe, account: account)
+        case .focus: FocusTab(track: track, agent: sections.isOn(.coach) ? agent : nil)
+        case .money: MoneyTab(track: track, agent: sections.isOn(.coach) ? agent : nil)
+        case .closet: ClosetTab(wardrobe: wardrobe, account: account, home: days.places.place(id: Place.homeID))
         case .coach: CoachView(store: store, plan: plan, health: health, food: food, track: track, account: account, wardrobe: wardrobe, agent: agent, sections: sections)
         }
     }

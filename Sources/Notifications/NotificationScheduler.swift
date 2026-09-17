@@ -16,6 +16,8 @@ enum NotificationScheduler {
     static let movedPrefix = "moved-"
     // "Leave now" reminders: start − travel, for blocks at another place
     static let leavePrefix = "leave-"
+    // Morning brief: one line about the day, when the first block ends
+    static let briefPrefix = "brief-"
     // Result of a replan done from a notification action; UNDO reverts it
     static let undoCategoryID = "REPLAN_UNDO"
     static let undoActionID = "UNDO"
@@ -112,6 +114,7 @@ enum NotificationScheduler {
         checkIns: Bool = true,
         places: Places = Places(),
         legOverrides: (String) -> [String: Int] = { _ in [:] },
+        brief: Bool = true,
         calendar: Calendar = .current
     ) -> [UNNotificationRequest] {
         var requests: [(Date, UNNotificationRequest)] = []
@@ -121,6 +124,9 @@ enum NotificationScheduler {
             let done = completed(dayKey), skip = skipped(dayKey), moved = movedIDs(dayKey)
             let dayPlan = plan(day)
             let legs = DayLogic.travelLegs(dayPlan.filter { $0.occurs(on: day, calendar: calendar) }, places: places, overrides: legOverrides(dayKey))
+            if brief, let request = briefRequest(for: dayPlan.filter { $0.occurs(on: day, calendar: calendar) }, day: day, dayKey: dayKey, now: now, legs: legs, moved: moved, calendar: calendar) {
+                requests.append(request)
+            }
             for block in dayPlan where block.occurs(on: day, calendar: calendar) {
                 guard !done.contains(block.id), !skip.contains(block.id) else { continue }
                 if let leg = legs[block.id], let start = block.startDate(on: day, calendar: calendar),
@@ -154,13 +160,39 @@ enum NotificationScheduler {
         return requests.sorted { $0.0 < $1.0 }.map(\.1)
     }
 
+    /// "Your Thursday: 21 blocks · Gym 19:15 (Arms) · leave for Work by 09:15 · Lunch moved" — fires
+    /// when the first timed block of the day ends, so it lands after waking, not during.
+    static func briefRequest(for blocks: [Block], day: Date, dayKey: String, now: Date, legs: [String: (minutes: Int, from: String)], moved: Set<String>, calendar: Calendar) -> (Date, UNNotificationRequest)? {
+        let sorted = DayLogic.sorted(blocks)
+        guard let first = sorted.first(where: { $0.start != nil }), let fire = first.endDate(on: day, calendar: calendar), fire > now else { return nil }
+        var parts: [String] = ["\(sorted.count) blocks"]
+        let training = sorted.filter { $0.autoComplete == .run || $0.autoComplete == .strength }
+        if !training.isEmpty {
+            parts.append(training.map { b in b.label + (b.start.map { " \(DayLogic.clock($0))" } ?? "") + (b.note(on: day, calendar: calendar).map { " (\($0))" } ?? "") }.joined(separator: ", "))
+        }
+        if let block = sorted.first(where: { legs[$0.id] != nil }), let leg = legs[block.id], let start = block.start {
+            parts.append("leave for \(block.label) by \(DayLogic.clock(DayLogic.components(minutes: DayLogic.minutes(start) - leg.minutes)))")
+        }
+        let movedLabels = sorted.filter { moved.contains($0.id) }.map(\.label)
+        if !movedLabels.isEmpty { parts.append("moved: " + movedLabels.joined(separator: ", ")) }
+        let content = UNMutableNotificationContent()
+        content.title = "Your \(day.formatted(.dateTime.weekday(.wide)))"
+        content.body = parts.joined(separator: " · ")
+        content.sound = sound
+        content.userInfo = [dayKeyKey: dayKey]
+        content.threadIdentifier = "autopiloto"
+        return (fire, UNNotificationRequest(identifier: "\(briefPrefix)\(dayKey)", content: content, trigger: trigger(fire, calendar)))
+    }
+
     private static func trigger(_ fire: Date, _ calendar: Calendar) -> UNCalendarNotificationTrigger {
         UNCalendarNotificationTrigger(dateMatching: calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fire), repeats: false)
     }
 
     static func checkInIdentifier(_ blockID: String, dayKey: String) -> String { "\(checkInPrefix)\(blockID)-\(dayKey)" }
     static func movedIdentifier(_ blockID: String, dayKey: String) -> String { "\(movedPrefix)\(blockID)-\(dayKey)" }
-    static func isOneShot(_ identifier: String) -> Bool { identifier.hasPrefix(checkInPrefix) || identifier.hasPrefix(movedPrefix) || identifier.hasPrefix(leavePrefix) }
+    static func isOneShot(_ identifier: String) -> Bool {
+        identifier.hasPrefix(checkInPrefix) || identifier.hasPrefix(movedPrefix) || identifier.hasPrefix(leavePrefix) || identifier.hasPrefix(briefPrefix)
+    }
 
     /// Replaces only the `checkin-*` / `moved-*` requests (start notifications and snoozes are
     /// untouched). Keeps the total under `maxPending`: soonest win, the rest are logged.
@@ -174,6 +206,7 @@ enum NotificationScheduler {
         checkIns: Bool = true,
         places: Places = Places(),
         legOverrides: (String) -> [String: Int] = { _ in [:] },
+        brief: Bool = true,
         calendar: Calendar = .current,
         center: NotificationCenterClient = .live
     ) async -> Int {
@@ -181,7 +214,7 @@ enum NotificationScheduler {
         let stale = pending.filter(isOneShot)
         center.removePending(stale)
         let room = max(0, maxPending - (pending.count - stale.count))
-        let wanted = buildCheckIns(plan: plan, now: now, completed: completed, skipped: skipped, movedIDs: movedIDs, checkIns: checkIns, places: places, legOverrides: legOverrides, calendar: calendar)
+        let wanted = buildCheckIns(plan: plan, now: now, completed: completed, skipped: skipped, movedIDs: movedIDs, checkIns: checkIns, places: places, legOverrides: legOverrides, brief: brief, calendar: calendar)
         if wanted.count > room {
             log.warning("\(wanted.count) check-ins wanted, room for \(room); dropping the latest ones")
         }
