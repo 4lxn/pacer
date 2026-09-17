@@ -78,7 +78,8 @@ Coach profile: `UserDefaults`. API key and session token: Keychain (`APIKeyStore
 on the main actor against the stores — including `move_today` / `skip_today` / `undo_replan` through
 `DayMutator`. The system prompt = profile (cached) + `CoachContext.snapshot` over the effective plan.
 Requests go to `server/` (Railway: Sign in with Apple → session token, StoreKit subscription, daily
-limit) or directly with the user's own key.
+limit) or directly with the user's own key. Answers stream (SSE): `CoachStream` rebuilds the content
+array from events while `CoachAgent.partial` feeds the live bubble; the proxy pipes Anthropic's stream through.
 
 ## Sections
 

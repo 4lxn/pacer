@@ -4,6 +4,11 @@ Deferred work with enough context to pick up cold. Effort is human-team → with
 
 ## P2
 
+- **Spanish localization** — the app's UI is English; Alan's market is MX. String catalog +
+  `Localizable.xcstrings`, coach already answers in the user's language. Effort: L → M.
+- **Recurring money entries** — salary / rent repeat monthly; today each month is typed again.
+  Effort: S → S.
+
 - **Moved/one-off notifications beyond tomorrow** — `rearmCheckIns` covers today + tomorrow, so a
   block moved for the day after tomorrow gets its one-shot start only once that day is within the
   window (app open, BG refresh, or a notification action). Extend `checkInDays` or arm on edit.
@@ -39,7 +44,6 @@ Deferred work with enough context to pick up cold. Effort is human-team → with
   not span iPhone ↔ Watch. Effort: L → M.
 - **iCloud sync** — NSUbiquitousKeyValueStore is too small; CloudKit records per store.
   Effort: L → M. Blocked by: a second device asking for it.
-- **Streaming Coach answers** — SSE from the Messages API through the proxy. Effort: M → S.
 - **App Store Server API verification on the proxy** — today the subscription is trusted from
   the client; the per-Apple-id daily cap is the only guard. Verify `Transaction.jwsRepresentation`
   server-side before issuing a session. Effort: M → S.

@@ -89,3 +89,15 @@ A section that can't do all five is a widget, not a section.
 5. App Intents / Siri for Today and Focus.
 6. Today: evening review + streak. Train: goals, readiness, PRs.
 7. Closet: weather (WeatherKit) if the entitlement is granted.
+
+
+## Status 2026-09-17 02:40
+
+Steps 1–7 shipped overnight as builds 12–17 (PRs #32–#38): sections registry + Settings → Sections
++ onboarding step; Focus (timer, Dynamic Island, subjects, heat map); Money (expenses, budgets,
+savings); Food (water, plan my meals, averages); Siri / Shortcuts; Today review + streak; Train
+goals + readiness + bests; morning brief; coach chips per moment + ask-the-coach buttons; Closet
+cards + WeatherKit; export data; onboarding pins Home; streaming coach answers (proxy deployed).
+
+Next candidates: Spanish localization (the market), APNs for Live Activity boundaries, outfit
+history, Focus widget, Money recurring entries, App Store screenshots + listing from the new tabs.
