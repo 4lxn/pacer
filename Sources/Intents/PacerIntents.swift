@@ -124,7 +124,7 @@ struct LogWaterIntent: AppIntent {
 
 struct LogWeightIntent: AppIntent {
     static let title: LocalizedStringResource = "Log weight"
-    static let description = IntentDescription("Saves today's weight to Apple Health.")
+    static let description = IntentDescription("Saves today's weight to the Health app.")
     static let openAppWhenRun = false
     @Parameter(title: "Kilograms") var kilograms: Double
 
