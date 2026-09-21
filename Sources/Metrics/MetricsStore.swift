@@ -12,6 +12,7 @@ final class MetricsStore {
         case replanApp, replanNotification, replanNoRoom
         case undo
         case checkInDone, checkInSkip, checkInReplan   // actions taken on a check-in notification
+        case appOpen                                    // the app came to the foreground
     }
 
     struct Week: Equatable {

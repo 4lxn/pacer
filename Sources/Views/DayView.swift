@@ -120,11 +120,13 @@ struct DayView: View {
             if phase == .active {
                 now = .now
                 store.reload()
+                metrics.record(.appOpen)
                 Task {
                     await refreshNotifications()
                     await autoCompleteFromHealth()
                     await rearmCheckIns()
                     await TravelEstimator.refreshLegs(mutator)
+                    await Telemetry.ping(metrics: metrics, mutator: mutator)
                 }
             }
         }
