@@ -39,7 +39,7 @@ final class CheckInTests: XCTestCase {
             plan: { _ in Plan.blocks }, now: now,
             completed: { $0 == "2026-09-16" ? ["b09"] : [] },
             skipped: { $0 == "2026-09-17" ? ["b17"] : [] },
-            brief: false, calendar: calendar
+            brief: false, endNudges: false, calendar: calendar
         )
         let ids = requests.map(\.identifier)
         // Today: morning ones are past, lunch is done → b14 b16 b17. Tomorrow: all 7 minus skipped b17.
@@ -65,7 +65,7 @@ final class CheckInTests: XCTestCase {
         let fake = FakeCenter(pending: starts + ["b13-snooze", "checkin-old-2026-09-15"])
         let added = await NotificationScheduler.rearmCheckIns(
             for: Plan.blocks, now: date(16, 12), completed: { _ in [] }, skipped: { _ in [] },
-            calendar: calendar, center: fake.client
+            endNudges: false, calendar: calendar, center: fake.client
         )
         XCTAssertEqual(fake.removed, ["checkin-old-2026-09-15"])
         XCTAssertEqual(added, 12)   // today b09 b14 b16 b17 + all 7 tomorrow + tomorrow's brief
@@ -77,7 +77,7 @@ final class CheckInTests: XCTestCase {
         let crowded = FakeCenter(pending: (0..<60).map { "s\($0)" })
         let addedCrowded = await NotificationScheduler.rearmCheckIns(
             for: Plan.blocks, now: date(16, 12), completed: { _ in [] }, skipped: { _ in [] },
-            calendar: calendar, center: crowded.client
+            endNudges: false, calendar: calendar, center: crowded.client
         )
         XCTAssertEqual(addedCrowded, 4)
         XCTAssertEqual(crowded.added.map(\.identifier).first, "checkin-b09-2026-09-16")
@@ -156,5 +156,48 @@ final class MorningBriefTests: XCTestCase {
         XCTAssertEqual((r.1.trigger as! UNCalendarNotificationTrigger).dateComponents.hour, 7)
         XCTAssertEqual((r.1.trigger as! UNCalendarNotificationTrigger).dateComponents.minute, 40)
         XCTAssertNil(NotificationScheduler.briefRequest(for: blocks, day: day, dayKey: "x", now: day.addingTimeInterval(3 * 3600), legs: [:], moved: [], calendar: c))
+    }
+}
+
+@MainActor
+final class TimeNudgeTests: XCTestCase {
+    private let calendar: Calendar = {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "America/Mexico_City")!
+        return c
+    }()
+    private func date(_ d: Int, _ h: Int, _ m: Int = 0) -> Date {
+        calendar.date(from: DateComponents(year: 2026, month: 9, day: d, hour: h, minute: m))!
+    }
+
+    func testLongBlocksGetAnEndsSoonNudgeAndQuietBlocksGetNothing() {
+        let plan = [
+            Block(id: "long", label: "Deep work", kind: .fixed, start: .hm(14, 0), end: .hm(16, 0)),
+            Block(id: "short", label: "Snack", kind: .fixed, start: .hm(16, 0), end: .hm(16, 15)),
+            Block(id: "hush", label: "Nap", kind: .window, start: .hm(17, 0), end: .hm(18, 0), checkIn: true, quiet: true),
+        ]
+        let now = date(16, 12)
+        let requests = NotificationScheduler.buildCheckIns(plan: { _ in plan }, now: now, completed: { _ in [] }, skipped: { _ in [] }, brief: false, calendar: calendar)
+        let ids = requests.map(\.identifier)
+        XCTAssertTrue(ids.contains("ends-long-2026-09-16"))
+        XCTAssertFalse(ids.contains("ends-short-2026-09-16"), "15 min blocks get no nudge")
+        XCTAssertFalse(ids.contains { $0.contains("hush") }, "quiet: no check-in, no nudge")
+        let nudge = requests.first { $0.identifier == "ends-long-2026-09-16" }!
+        XCTAssertEqual((nudge.trigger as? UNCalendarNotificationTrigger)?.dateComponents.minute, 55)
+        XCTAssertEqual(nudge.content.title, "Deep work ends in 5 min")
+        XCTAssertTrue(NotificationScheduler.isOneShot("ends-long-2026-09-16"))
+
+        let off = NotificationScheduler.buildCheckIns(plan: { _ in plan }, now: now, completed: { _ in [] }, skipped: { _ in [] }, brief: false, endNudges: false, calendar: calendar)
+        XCTAssertFalse(off.map(\.identifier).contains { $0.hasPrefix("ends-") })
+        XCTAssertTrue(NotificationScheduler.buildRequests(for: plan).map(\.identifier).contains("long"))
+        XCTAssertFalse(NotificationScheduler.buildRequests(for: [Block(id: "q", label: "Q", kind: .fixed, start: .hm(9, 0), end: .hm(9, 5), quiet: true)]).contains { $0.identifier == "q" })
+    }
+
+    func testQuietSurvivesCoding() throws {
+        let block = Block(id: "x", label: "X", kind: .fixed, start: .hm(9, 0), end: .hm(9, 5), quiet: true)
+        let back = try JSONDecoder().decode(Block.self, from: JSONEncoder().encode(block))
+        XCTAssertTrue(back.quiet)
+        let legacy = try JSONDecoder().decode(Block.self, from: Data(#"{"id":"y","label":"Y","kind":"fixed","isAnchor":false}"#.utf8))
+        XCTAssertFalse(legacy.quiet)
     }
 }

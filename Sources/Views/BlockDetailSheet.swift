@@ -46,6 +46,7 @@ struct BlockDetailSheet: View {
                             chip(block.kind.rawValue)
                             if isExtra { chip("today only") }
                             if isMoved { chip("moved") }
+                            if block.quiet { chip("quiet") }
                             if let weekday = block.note(on: now, calendar: calendar) { chip(weekday) }
                             chip(statusText, tint: status == .missed ? .red : status == .done ? .accentColor : nil)
                         }

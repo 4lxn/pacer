@@ -16,6 +16,8 @@ final class DayStore {
     var liveActivity = true { didSet { saveSettings() } }
     /// One notification when the first block ends: the day in one line.
     var morningBrief = true { didSet { saveSettings() } }
+    /// "Ends in 5 min" for blocks of 30 min or more.
+    var endNudges = true { didSet { saveSettings() } }
     /// "pacer" (the bundled chime) or "system".
     var sound = "pacer" { didSet { saveSettings() } }
     /// Places and travel times between them (`places.json`).
@@ -30,6 +32,7 @@ final class DayStore {
         var sound: String?
         var liveActivity: Bool?
         var morningBrief: Bool?
+        var endNudges: Bool?
     }
 
     private let overridesURL: URL
@@ -56,12 +59,13 @@ final class DayStore {
             sound = s.sound ?? "pacer"
             liveActivity = s.liveActivity ?? true
             morningBrief = s.morningBrief ?? true
+            endNudges = s.endNudges ?? true
         } else {
             dayEnd = fallbackDayEnd
         }
     }
 
-    private func saveSettings() { JSONFile.save(Settings(dayEnd: dayEnd, checkInsEnabled: checkInsEnabled, sound: sound, liveActivity: liveActivity, morningBrief: morningBrief), to: settingsURL) }
+    private func saveSettings() { JSONFile.save(Settings(dayEnd: dayEnd, checkInsEnabled: checkInsEnabled, sound: sound, liveActivity: liveActivity, morningBrief: morningBrief, endNudges: endNudges), to: settingsURL) }
 
     func override(dayKey: String) -> DayOverride { overrides[dayKey] ?? DayOverride() }
 

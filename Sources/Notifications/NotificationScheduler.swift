@@ -18,6 +18,10 @@ enum NotificationScheduler {
     static let leavePrefix = "leave-"
     // Morning brief: one line about the day, when the first block ends
     static let briefPrefix = "brief-"
+    // "Ends in 5 min": for long blocks, so the end is not a surprise (time blindness)
+    static let endsPrefix = "ends-"
+    static let endNudgeLeadMinutes = 5
+    static let endNudgeMinDuration = 30
     // Result of a replan done from a notification action; UNDO reverts it
     static let undoCategoryID = "REPLAN_UNDO"
     static let undoActionID = "UNDO"
@@ -44,7 +48,7 @@ enum NotificationScheduler {
     /// One repeating calendar trigger per `.fixed` block. Blocks limited to some weekdays get one
     /// trigger per weekday. Pure.
     static func buildRequests(for blocks: [Block]) -> [UNNotificationRequest] {
-        blocks.filter { $0.kind == .fixed }.flatMap { block -> [UNNotificationRequest] in
+        blocks.filter { $0.kind == .fixed && !$0.quiet }.flatMap { block -> [UNNotificationRequest] in
             guard let start = block.start else { return [] }
             let weekdays: [Int?] = block.weekdays.map { $0.sorted().map(Optional.some) } ?? [nil]
             return weekdays.map { weekday in
@@ -115,6 +119,7 @@ enum NotificationScheduler {
         places: Places = Places(),
         legOverrides: (String) -> [String: Int] = { _ in [:] },
         brief: Bool = true,
+        endNudges: Bool = true,
         calendar: Calendar = .current
     ) -> [UNNotificationRequest] {
         var requests: [(Date, UNNotificationRequest)] = []
@@ -128,7 +133,7 @@ enum NotificationScheduler {
                 requests.append(request)
             }
             for block in dayPlan where block.occurs(on: day, calendar: calendar) {
-                guard !done.contains(block.id), !skip.contains(block.id) else { continue }
+                guard !done.contains(block.id), !skip.contains(block.id), !block.quiet else { continue }
                 if let leg = legs[block.id], let start = block.startDate(on: day, calendar: calendar),
                    let fire = calendar.date(byAdding: .minute, value: -leg.minutes, to: start), fire > now {
                     let content = UNMutableNotificationContent()
@@ -149,6 +154,17 @@ enum NotificationScheduler {
                     content.userInfo = [blockIDKey: block.id, dayKeyKey: dayKey]
                     content.threadIdentifier = "autopiloto-checkin"
                     requests.append((fire, UNNotificationRequest(identifier: checkInIdentifier(block.id, dayKey: dayKey), content: content, trigger: trigger(fire, calendar))))
+                }
+                if endNudges, (block.durationMinutes ?? 0) >= endNudgeMinDuration, !block.isAnchor, let end = block.endDate(on: day, calendar: calendar),
+                   let fire = calendar.date(byAdding: .minute, value: -endNudgeLeadMinutes, to: end), fire > now {
+                    let content = UNMutableNotificationContent()
+                    content.title = "\(block.label) ends in \(endNudgeLeadMinutes) min"
+                    content.body = "Wrap up, or mark it done."
+                    content.sound = sound
+                    content.categoryIdentifier = categoryID
+                    content.userInfo = [blockIDKey: block.id, dayKeyKey: dayKey]
+                    content.threadIdentifier = "autopiloto"
+                    requests.append((fire, UNNotificationRequest(identifier: "\(endsPrefix)\(block.id)-\(dayKey)", content: content, trigger: trigger(fire, calendar))))
                 }
                 if moved.contains(block.id), let fire = block.startDate(on: day, calendar: calendar), fire > now {
                     let content = content(for: block)
@@ -191,7 +207,7 @@ enum NotificationScheduler {
     static func checkInIdentifier(_ blockID: String, dayKey: String) -> String { "\(checkInPrefix)\(blockID)-\(dayKey)" }
     static func movedIdentifier(_ blockID: String, dayKey: String) -> String { "\(movedPrefix)\(blockID)-\(dayKey)" }
     static func isOneShot(_ identifier: String) -> Bool {
-        identifier.hasPrefix(checkInPrefix) || identifier.hasPrefix(movedPrefix) || identifier.hasPrefix(leavePrefix) || identifier.hasPrefix(briefPrefix)
+        identifier.hasPrefix(checkInPrefix) || identifier.hasPrefix(movedPrefix) || identifier.hasPrefix(leavePrefix) || identifier.hasPrefix(briefPrefix) || identifier.hasPrefix(endsPrefix)
     }
 
     /// Replaces only the `checkin-*` / `moved-*` requests (start notifications and snoozes are
@@ -207,6 +223,7 @@ enum NotificationScheduler {
         places: Places = Places(),
         legOverrides: (String) -> [String: Int] = { _ in [:] },
         brief: Bool = true,
+        endNudges: Bool = true,
         calendar: Calendar = .current,
         center: NotificationCenterClient = .live
     ) async -> Int {
@@ -214,7 +231,7 @@ enum NotificationScheduler {
         let stale = pending.filter(isOneShot)
         center.removePending(stale)
         let room = max(0, maxPending - (pending.count - stale.count))
-        let wanted = buildCheckIns(plan: plan, now: now, completed: completed, skipped: skipped, movedIDs: movedIDs, checkIns: checkIns, places: places, legOverrides: legOverrides, brief: brief, calendar: calendar)
+        let wanted = buildCheckIns(plan: plan, now: now, completed: completed, skipped: skipped, movedIDs: movedIDs, checkIns: checkIns, places: places, legOverrides: legOverrides, brief: brief, endNudges: endNudges, calendar: calendar)
         if wanted.count > room {
             log.warning("\(wanted.count) check-ins wanted, room for \(room); dropping the latest ones")
         }
@@ -235,10 +252,11 @@ enum NotificationScheduler {
         now: Date = .now,
         completed: (String) -> Set<String>,
         skipped: (String) -> Set<String>,
+        endNudges: Bool = true,
         calendar: Calendar = .current,
         center: NotificationCenterClient = .live
     ) async -> Int {
-        await rearmCheckIns(plan: { _ in blocks }, now: now, completed: completed, skipped: skipped, calendar: calendar, center: center)
+        await rearmCheckIns(plan: { _ in blocks }, now: now, completed: completed, skipped: skipped, endNudges: endNudges, calendar: calendar, center: center)
     }
 
     /// Cancels one day's check-in for a block (after Done / Skip).
