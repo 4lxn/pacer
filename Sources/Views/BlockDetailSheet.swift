@@ -180,13 +180,19 @@ struct TodayOnlySheet: View {
     @State private var kind: BlockKind = .window
     @State private var start = Date.now
     @State private var end = Date.now.addingTimeInterval(1800)
+    @State private var quick = ""
     @FocusState private var labelFocused: Bool
     private let calendar = Calendar.current
 
     var body: some View {
         NavigationStack {
             Form {
-                TextField("What?", text: $label).focused($labelFocused)
+                Section {
+                    TextField("gym 7pm 45m", text: $quick).focused($labelFocused)
+                        .autocorrectionDisabled()
+                        .onChange(of: quick) { _, text in applyQuick(text) }
+                } footer: { Text("One line: what, when, how long. The fields below follow.") }
+                TextField("What?", text: $label)
                 Picker("Kind", selection: $kind) {
                     Text("Window — anytime in range").tag(BlockKind.window)
                     Text("Fixed — notifies at start").tag(BlockKind.fixed)
@@ -218,6 +224,19 @@ struct TodayOnlySheet: View {
                 labelFocused = true
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
+    }
+
+    /// The typed line fills label, kind and times; the pickers stay editable.
+    private func applyQuick(_ text: String) {
+        guard let parsed = QuickAdd.parse(text) else { return }
+        label = parsed.label
+        if let s = parsed.start, let e = parsed.end {
+            kind = .window
+            start = calendar.date(bySettingHour: s.hour ?? 0, minute: s.minute ?? 0, second: 0, of: now) ?? start
+            end = calendar.date(bySettingHour: e.hour ?? 0, minute: e.minute ?? 0, second: 0, of: now) ?? end
+        } else {
+            kind = .free
+        }
     }
 }

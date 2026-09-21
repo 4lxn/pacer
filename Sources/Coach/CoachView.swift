@@ -20,6 +20,8 @@ struct CoachView: View {
     @State private var draft = ""
     @State private var confirmClear = false
     @State private var showingHistory = false
+    @State private var speech = SpeechCapture()
+    @State private var agentError: String?
     @FocusState private var inputFocused: Bool
     @Namespace private var glass
 
@@ -143,7 +145,7 @@ struct CoachView: View {
                         HStack(spacing: 8) { ProgressView(); Text("Thinking…").foregroundStyle(.secondary) }
                             .padding(.horizontal, 4).id("busy")
                     }
-                    if let error = agent.lastError {
+                    if let error = agent.lastError ?? agentError {
                         Text(error).font(.footnote).foregroundStyle(.red).padding(.horizontal, 4)
                     }
                     Color.clear.frame(height: 72).id("bottom")   // room for the floating input bar
@@ -188,19 +190,47 @@ struct CoachView: View {
                             Button("Done") { inputFocused = false }
                         }
                     }
-                Button { send() } label: {
-                    Image(systemName: agent.isBusy ? "hourglass" : "arrow.up")
-                        .font(.body.weight(.semibold))
-                        .frame(width: 44, height: 44)
+                if speech.isAvailable && (draft.isEmpty || speech.isRecording) {
+                    Button { toggleMic() } label: {
+                        Image(systemName: speech.isRecording ? "stop.fill" : "mic.fill")
+                            .font(.body.weight(.semibold))
+                            .frame(width: 44, height: 44)
+                            .symbolEffect(.pulse, isActive: speech.isRecording)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .tint(speech.isRecording ? .red : .accentColor)
+                    .clipShape(Circle())
+                    .disabled(agent.isBusy)
+                    .accessibilityLabel(speech.isRecording ? "Stop and send" : "Speak")
+                } else {
+                    Button { send() } label: {
+                        Image(systemName: agent.isBusy ? "hourglass" : "arrow.up")
+                            .font(.body.weight(.semibold))
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .clipShape(Circle())
+                    .disabled(agent.isBusy || draft.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .accessibilityLabel("Send")
                 }
-                .buttonStyle(.glassProminent)
-                .clipShape(Circle())
-                .disabled(agent.isBusy || draft.trimmingCharacters(in: .whitespaces).isEmpty)
-                .accessibilityLabel("Send")
             }
         }
         .padding(.horizontal, 12)
         .padding(.bottom, 6)
+        .onChange(of: speech.transcript) { _, t in if speech.isRecording { draft = t } }
+        .onChange(of: speech.error) { _, e in if let e { agentError = e } }
+    }
+
+    /// Tap: listen. Tap again: stop and send what was heard. Nothing heard: nothing sent.
+    private func toggleMic() {
+        if speech.isRecording {
+            speech.stop()
+            draft = speech.transcript
+            if !draft.trimmingCharacters(in: .whitespaces).isEmpty { send() }
+            return
+        }
+        inputFocused = false
+        Task { if await speech.authorize() { speech.start() } }
     }
 
     private var emptyState: some View {
