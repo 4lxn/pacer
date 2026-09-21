@@ -20,6 +20,7 @@ if (!ANTHROPIC_API_KEY || !SESSION_SECRET) {
 const limiter = new DailyLimiter(Number(DAILY_LIMIT));
 
 function json(res, status, body) {
+  if (status >= 400) console.error(status, body.error);
   res.writeHead(status, { "content-type": "application/json" });
   res.end(JSON.stringify(body));
 }

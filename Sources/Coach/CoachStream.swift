@@ -102,12 +102,20 @@ extension CoachClient {
         }
         var parser = CoachStream.Parser()
         var assembler = CoachStream.Assembler()
-        for try await line in bytes.lines {
+        // A blank line ends an SSE event and `bytes.lines` drops blank lines, so split by hand.
+        var buffer: [UInt8] = []
+        for try await byte in bytes {
+            guard byte == UInt8(ascii: "\n") else { buffer.append(byte); continue }
+            if buffer.last == UInt8(ascii: "\r") { buffer.removeLast() }
+            let line = String(decoding: buffer, as: UTF8.self)
+            buffer.removeAll(keepingCapacity: true)
             guard let event = parser.feed(line: line) else { continue }
             if let text = assembler.apply(event) { await onText(text) }
             if let error = assembler.error { throw CoachError.http(status, error) }
         }
-        if let event = parser.feed(line: ""), let text = assembler.apply(event) { await onText(text) }
+        for line in [String(decoding: buffer, as: UTF8.self), ""] {
+            if let event = parser.feed(line: line), let text = assembler.apply(event) { await onText(text) }
+        }
         if let error = assembler.error { throw CoachError.http(status, error) }
         return assembler.response
     }
