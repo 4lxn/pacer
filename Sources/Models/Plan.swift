@@ -38,7 +38,7 @@ enum Plan {
     /// A generic day built around the user's wake and sleep times. Work blocks Mon–Fri.
     /// A sleep time after midnight is clamped to 23:30 — the day is the calendar day, and a
     /// 00:30 block would sort first and read as missed all day.
-    static func starter(wake: DateComponents, sleep: DateComponents) -> [Block] {
+    static func starter(wake: DateComponents, sleep: DateComponents, includeTraining: Bool = true) -> [Block] {
         func minutes(_ c: DateComponents) -> Int { (c.hour ?? 0) * 60 + (c.minute ?? 0) }
         let sleep = minutes(sleep) <= minutes(wake) ? DateComponents.hm(23, 30) : sleep
         func at(_ base: DateComponents, _ minutes: Int) -> DateComponents {
@@ -46,18 +46,19 @@ enum Plan {
             return .hm(total / 60, total % 60)
         }
         let id = { UUID().uuidString }
-        return [
+        let blocks: [Block?] = [
             Block(id: id(), label: "Wake up", kind: .fixed, start: wake, end: at(wake, 5), isAnchor: true),
             Block(id: id(), label: "Morning routine", kind: .window, start: at(wake, 5), end: at(wake, 45)),
             Block(id: id(), label: "Breakfast", kind: .window, start: at(wake, 30), end: at(wake, 60)),
             Block(id: id(), label: "Work", kind: .fixed, start: at(wake, 150), end: at(wake, 330), weekdays: weekdaysMonFri),
             Block(id: id(), label: "Lunch", kind: .window, start: at(wake, 330), end: at(wake, 370)),
             Block(id: id(), label: "Work", kind: .fixed, start: at(wake, 390), end: at(wake, 540), weekdays: weekdaysMonFri),
-            Block(id: id(), label: "Train", kind: .window, start: at(wake, 600), end: at(wake, 660)),
+            includeTraining ? Block(id: id(), label: "Train", kind: .window, start: at(wake, 600), end: at(wake, 660)) : nil,
             Block(id: id(), label: "One thing for the future", kind: .free),
             Block(id: id(), label: "Dinner", kind: .window, start: at(sleep, -180), end: at(sleep, -150)),
             Block(id: id(), label: "Wind down, screens off", kind: .fixed, start: at(sleep, -45), end: at(sleep, -35)),
             Block(id: id(), label: "Sleep", kind: .fixed, start: sleep, end: at(sleep, 15)),
         ]
+        return blocks.compactMap { $0 }
     }
 }
