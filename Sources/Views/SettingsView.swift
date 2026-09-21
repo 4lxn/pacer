@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var editingProfile = false
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
     @State private var showPlaces = false
+    @State private var telemetry = Telemetry.isEnabled
 
     private var dayEnd: Binding<Date> {
         Binding(
@@ -92,6 +93,17 @@ struct SettingsView: View {
                     }
                 } footer: { Text("Every JSON file the app keeps (plan, days, food, focus, money, closet, places, chats) in one file you own.") }
 
+                Section {
+                    Toggle("Share anonymous usage counts", isOn: $telemetry)
+                        .onChange(of: telemetry) { _, on in Telemetry.isEnabled = on }
+                    Button("Send feedback", systemImage: "envelope") {
+                        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? ""
+                        open(URL(string: "mailto:alangibrancs@icloud.com?subject=Pacer%20feedback%20(build%20\(build))"))
+                    }
+                } header: { Text("Privacy") } footer: {
+                    Text("Your plan, health data and places stay on this phone. Ask sends only what a question needs, and it isn't stored. Usage counts are a random id and a few numbers a day (opened, blocks closed, check-ins answered) so we can tell whether Pacer works; never what the blocks are.")
+                }
+
                 Section("About") {
                     LabeledContent("Version", value: Diagnostics.version)
                     NavigationLink("Diagnostics") { DiagnosticsView(days: days, metrics: metrics, health: health, plan: plan) }
@@ -163,6 +175,7 @@ enum Diagnostics {
         var dayEnd: DateComponents
         var week: MetricsStore.Week
         var files: [(String, Int)]
+        var telemetryID: String? = nil
     }
 
     static func report(_ i: Input) -> String {
@@ -181,6 +194,7 @@ enum Diagnostics {
         Files: \(i.files.map { "\($0.0) \($0.1) B" }.joined(separator: ", "))
         Week: done \(i.week.done) (health \(i.week.healthClosed)), skipped \(i.week.skipped), replans \(i.week.replans), undone \(i.week.undone)
         Replan criterion: check-ins acted \(i.week.checkInsActed), replan share \(pct(i.week.replanShare)) (keep ≥ 30%), replans kept \(pct(i.week.replanKept)) (keep ≥ 70%)
+        Usage counts: \(i.telemetryID.map { "on, id \($0)" } ?? "off")
         """
     }
 }
@@ -232,7 +246,8 @@ struct DiagnosticsView: View {
             healthAvailable: health.isAvailable, healthAuthorized: health.isAuthorized, lastHealthDelivery: metrics.lastHealthDelivery,
             persistenceErrors: PersistenceState.shared.errorCount, lastPersistenceError: PersistenceState.shared.lastError,
             blocks: plan.blocks.count, checkInBlocks: plan.blocks.filter(\.checkIn).count, checkInsEnabled: days.checkInsEnabled,
-            dayEnd: days.dayEnd, week: metrics.week(), files: files
+            dayEnd: days.dayEnd, week: metrics.week(), files: files,
+            telemetryID: Telemetry.isEnabled ? Telemetry.id : nil
         ))
     }
 }
