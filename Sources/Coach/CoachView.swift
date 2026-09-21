@@ -68,7 +68,7 @@ struct CoachView: View {
                 }
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle(canAsk && !agent.chat.entries.isEmpty ? agent.chat.current.title : "Coach")
+            .navigationTitle(canAsk && !agent.chat.entries.isEmpty ? agent.chat.current.title : "Ask Pacer")
             .navigationBarTitleDisplayMode(canAsk && !agent.chat.entries.isEmpty ? .inline : .large)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarLeading) {
@@ -112,7 +112,7 @@ struct CoachView: View {
 
     private var menu: some View {
                 Menu {
-                    Button("Coach profile", systemImage: "person.text.rectangle") { editingProfile = true }
+                    Button("About you", systemImage: "person.text.rectangle") { editingProfile = true }
                     Button("Delete this chat", systemImage: "trash", role: .destructive) { confirmClear = true }
                     if CoachClient.proxyURL != nil {
                         Toggle("Use my own API key", isOn: $useOwnKey)
@@ -174,7 +174,7 @@ struct CoachView: View {
     private var inputBar: some View {
         GlassEffectContainer(spacing: 10) {
             HStack(alignment: .bottom, spacing: 10) {
-                TextField("Ask or tell the coach…", text: $draft, axis: .vertical)
+                TextField("Ask or tell Pacer…", text: $draft, axis: .vertical)
                     .lineLimit(1...5)
                     .padding(.horizontal, 14).padding(.vertical, 10)
                     .glassEffect(.regular, in: .rect(cornerRadius: 22))
@@ -205,7 +205,7 @@ struct CoachView: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Your coach knows today's plan, your training, food, study and closet — and can add, change or delete any of it.")
+            Text("Pacer knows today's plan and can move, add or skip anything in it. Say what happened; it fixes the day.")
                 .foregroundStyle(.secondary)
             GlassEffectContainer(spacing: 8) {
                 FlowLayout(spacing: 8) {
@@ -364,7 +364,7 @@ struct ProfileEditor: View {
             TextEditor(text: $text)
                 .font(.body.monospaced())
                 .padding(8)
-                .navigationTitle("Coach profile").navigationBarTitleDisplayMode(.inline)
+                .navigationTitle("About you").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) { Button("Save") { CoachProfile.save(text); dismiss() } }

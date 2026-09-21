@@ -37,7 +37,7 @@ struct MoneyContent: View {
         .sheet(isPresented: $addingRecurring) { RecurringForm(entry: RecurringEntry(kind: .expense, name: "", amount: 0, dayOfMonth: 1), isNew: true, currency: currency, categories: track.expenseCategories) { track.upsertRecurring($0); track.applyRecurring(now: now) } onDelete: { _ in } }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                if let agent { Button { agent.queued = "Where did my money go this month, and what should I watch?" } label: { Label("Ask the coach", systemImage: "sparkles") } }
+                if let agent { Button { agent.queued = "Where did my money go this month, and what should I watch?" } label: { Label("Ask Pacer", systemImage: "sparkles") } }
                 Button { addingIncome = true } label: { Label("Add income", systemImage: "plus.circle") }
                 Button { addingExpense = true } label: { Label("Add expense", systemImage: "minus.circle") }
             }

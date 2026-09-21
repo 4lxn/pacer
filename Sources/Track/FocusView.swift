@@ -38,7 +38,7 @@ struct FocusContent: View {
             if CoachAccount.screenshotMode == "focus-timer", !track.isStudying { start() }
             #endif
         }
-        .toolbar { if let agent { ToolbarItem(placement: .topBarTrailing) { Button { agent.queued = "How is my focus going this week, and what should I work on next?" } label: { Label("Ask the coach", systemImage: "sparkles") } } } }
+        .toolbar { if let agent { ToolbarItem(placement: .topBarTrailing) { Button { agent.queued = "How is my focus going this week, and what should I work on next?" } label: { Label("Ask Pacer", systemImage: "sparkles") } } } }
         .fullScreenCover(isPresented: $showTimer) { FocusTimerView(track: track) }
         .sheet(item: $editingSubject) { s in SubjectForm(subject: s) { track.upsertSubject($0) } onDelete: { track.deleteSubject(id: $0) } }
         .sheet(isPresented: $addingSubject) { SubjectForm(subject: Subject(name: subjectName.isEmpty ? "" : subjectName), isNew: true) { track.upsertSubject($0) } onDelete: { _ in } }

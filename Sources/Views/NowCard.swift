@@ -3,15 +3,18 @@ import SwiftUI
 struct NowCard: View {
     let block: Block?
     let allDone: Bool
+    var behind = false
     let now: Date
     let completed: Set<String>
     let calendar: Calendar
     let onDone: (String) -> Void
     var onSkip: ((String) -> Void)? = nil
     var onReplan: ((String) -> Void)? = nil
+    @State private var closing = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            PaceLine(behind: behind && !allDone)
             if let block {
                 let status = block.status(now: now, completed: completed, calendar: calendar)
                 Text(status == .missed ? "OVERDUE" : "NOW")
@@ -33,15 +36,26 @@ struct NowCard: View {
                     .monospacedDigit()
                 }
                 Button {
-                    onDone(block.id)
+                    // Closing is the reward: a beat of green and a checkmark before the card moves on.
+                    guard !closing else { return }
+                    withAnimation(.snappy(duration: 0.3)) { closing = true }
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(420))
+                        onDone(block.id)
+                    }
                 } label: {
-                    Text("Done")
-                        .font(.title3.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                    HStack(spacing: 8) {
+                        if closing { Image(systemName: "checkmark").transition(.scale.combined(with: .opacity)) }
+                        Text(closing ? "Closed" : "Done").contentTransition(.numericText())
+                    }
+                    .font(.title3.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
                 }
                 .buttonStyle(.glassProminent)
-                .tint(status == .missed ? .red : .accentColor)
+                .tint(closing ? .green : status == .missed ? .red : .accentColor)
+                .scaleEffect(closing ? 1.03 : 1)
+                .sensoryFeedback(.success, trigger: closing)
                 if status == .missed {
                     HStack(spacing: 10) {
                         if let onReplan, block.kind != .free, !block.isAnchor {
@@ -62,8 +76,8 @@ struct NowCard: View {
             } else if allDone {
                 Image(systemName: "checkmark.seal.fill").font(.system(size: 40)).foregroundStyle(Color.accentColor)
                     .symbolEffect(.bounce, options: .nonRepeating)
-                Text("All done for today").font(.largeTitle.weight(.bold))
-                Text("Nothing left on the plan. See you tomorrow.").foregroundStyle(.secondary)
+                Text("Day on pace").font(.largeTitle.weight(.bold))
+                Text("Everything on the plan is closed. See you tomorrow.").foregroundStyle(.secondary)
             } else {
                 Text("Nothing right now").font(.largeTitle.weight(.bold))
                 Text("Next block is below.").foregroundStyle(.secondary)

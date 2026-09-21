@@ -60,6 +60,12 @@ final class DayMutator {
         return date > current ? start : (calendar.date(byAdding: .day, value: 1, to: start)?.addingTimeInterval(-60) ?? date)
     }
 
+    /// Share of the day's counted blocks that are done; nil when nothing was planned.
+    func score(on day: Date) -> Double? {
+        let key = dayKey(day)
+        return DayLogic.dayScore(effectivePlan(on: day), completed: completions.completed(dayKey: key), skipped: completions.skipped(dayKey: key))
+    }
+
     func isEditable(_ date: Date) -> Bool { dayKey(date) >= dayKey(now()) }
 
     /// Drops every override on a day (moves, one-offs, notes). Skips stay.

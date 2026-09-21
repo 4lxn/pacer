@@ -171,7 +171,7 @@ struct WardrobeView: View {
             .padding(.horizontal, 4)
             if wardrobe.closet.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Photograph your clothes — several per photo is fine — and the coach names and files them.").foregroundStyle(.secondary)
+                    Text("Photograph your clothes — several per photo is fine — and Pacer names and files them.").foregroundStyle(.secondary)
                     HStack {
                         if UIImagePickerController.isSourceTypeAvailable(.camera) {
                             Button { showCamera = true } label: { Label("Take photos", systemImage: "camera") }.buttonStyle(.glassProminent).tint(tint)

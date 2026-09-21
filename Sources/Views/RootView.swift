@@ -15,6 +15,7 @@ struct RootView: View {
     @Bindable var agent: CoachAgent
     @Bindable var sections: SectionStore
     @State private var selectedTab = RootView.initialTab
+    @State private var askPresented = false
 
     /// Debug-only: `AUTOPILOTO_TAB=coach` opens on that tab (screenshots).
     private static var initialTab: String {
@@ -64,16 +65,30 @@ struct RootView: View {
             WidgetCenter.shared.reloadAllTimelines()
             Task { await NotificationScheduler.register(blocks) }
         }
-        .onChange(of: agent.queued) { _, q in if q != nil { selectedTab = AppSection.coach.rawValue } }
+        .onChange(of: agent.queued) { _, q in if q != nil { openAsk() } }
         .onOpenURL { url in
-            if let host = url.host, AppSection(rawValue: host) != nil { selectedTab = host }
+            guard let host = url.host, let section = AppSection(rawValue: host) else { return }
+            if section == .coach { openAsk() } else if sections.isOn(section) { selectedTab = host }
         }
+        .sheet(isPresented: $askPresented) { ask }
+    }
+
+    /// Ask is a sheet from anywhere; users who keep the Ask tab on get the tab instead.
+    private func openAsk() {
+        if sections.isOn(.coach) { selectedTab = AppSection.coach.rawValue } else { askPresented = true }
+    }
+
+    private var ask: some View {
+        CoachView(store: store, plan: plan, health: health, food: food, track: track, account: account, wardrobe: wardrobe, agent: agent, sections: sections)
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
     }
 
     @ViewBuilder
     private func view(for section: AppSection) -> some View {
         switch section {
-        case .today: DayView(store: store, plan: plan, days: days, mutator: mutator, metrics: metrics, health: health, track: track, account: account, sections: sections)
+        case .today: DayView(store: store, plan: plan, days: days, mutator: mutator, metrics: metrics, health: health, track: track, account: account, sections: sections, onAsk: openAsk)
+        case .pace: PaceView(mutator: mutator, metrics: metrics, plan: plan)
         case .train: TrainView(health: health, mutator: mutator, agent: sections.isOn(.coach) ? agent : nil)
         case .food: FoodView(food: food, account: account, agent: agent)
         case .focus: FocusTab(track: track, agent: sections.isOn(.coach) ? agent : nil)
