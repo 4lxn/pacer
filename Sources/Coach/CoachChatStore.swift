@@ -112,6 +112,7 @@ final class CoachChatStore {
     }
 
     func appendAssistant(content: [[String: Any]]) {
+        guard !content.isEmpty else { return }   // the API rejects empty content
         messages.append(["role": "assistant", "content": content])
         persist()
     }
@@ -142,7 +143,14 @@ final class CoachChatStore {
 
     // MARK: - Trimming
 
+    /// Drops assistant turns with no content (left behind by an earlier streaming bug); the API
+    /// refuses a conversation that contains one.
+    static func sanitized(_ messages: [[String: Any]]) -> [[String: Any]] {
+        messages.filter { !($0["role"] as? String == "assistant" && ($0["content"] as? [Any])?.isEmpty == true) }
+    }
+
     static func trimmed(_ messages: [[String: Any]], max: Int) -> [[String: Any]] {
+        let messages = sanitized(messages)
         guard messages.count > max else { return messages }
         // Cut at the earliest user *text* message that keeps the count ≤ max.
         var start = messages.count - max
@@ -177,7 +185,7 @@ final class CoachChatStore {
         messages = []; toolSummaries = [:]
         if let data = try? Data(contentsOf: directory.appendingPathComponent("\(c.id).json")),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            messages = json["messages"] as? [[String: Any]] ?? []
+            messages = Self.sanitized(json["messages"] as? [[String: Any]] ?? [])
             toolSummaries = json["toolSummaries"] as? [String: String] ?? [:]
         }
         rebuildEntries()
