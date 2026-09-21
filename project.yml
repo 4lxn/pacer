@@ -43,6 +43,8 @@ targets:
         INFOPLIST_KEY_NSHealthUpdateUsageDescription: "Pacer saves the weight you log so it shows up in Health and in your other apps."
         INFOPLIST_KEY_NSCameraUsageDescription: "Photograph a garment to add it to your closet."
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Pick a photo of a garment to add it to your closet."
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "Tap the mic in Ask to speak instead of typing. On devices that support it, recognition runs on the phone and audio never leaves it."
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "The mic is used only while you hold the Ask mic button."
         INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "Pacer uses your location only when you tap 'Use my current location' to pin a place. It is never tracked or sent anywhere."
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1"
