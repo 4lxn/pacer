@@ -40,6 +40,15 @@ final class ReplannerTests: XCTestCase {
         XCTAssertEqual(o.moved["study"], MovedTime(start: .hm(19, 0), end: .hm(20, 30)))
     }
 
+    func testCalendarBusyTimeIsAnObstacle() {
+        // Miss Study at 17:20 with a 17:30–19:00 meeting from the calendar: Study lands at 19:00.
+        var c = ctx([wake, study, dinner, screens], now: at(17, 20))
+        c.busy = [Replanner.Obstacle(start: 17 * 60 + 30, end: 19 * 60, label: "1:1 with Sam", place: nil)]
+        let outcome = Replanner.replan(study, in: c)
+        guard case let .moved(o, _, _) = outcome else { return XCTFail("\(outcome)") }
+        XCTAssertEqual(o.moved["study"], MovedTime(start: .hm(19, 0), end: .hm(20, 30)))
+    }
+
     func testShrinksToTheLargestGapWhenNothingFits() {
         let a = Block(id: "a", label: "A", kind: .fixed, start: .hm(18, 0), end: .hm(21, 0))
         let b = Block(id: "b", label: "B", kind: .fixed, start: .hm(21, 30), end: .hm(23, 0))

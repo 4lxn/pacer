@@ -6,12 +6,12 @@ Each story is a GitHub issue; status lives there.
 
 | # | Story | Need | Size | Status |
 |---|---|---|---|---|
-| S1 | Voice capture in Ask | #2 | M | issue |
-| S2 | Quick add by text on Now ("gym 7pm 45m") | #2, #5 | S | issue |
-| S3 | Gym/run blocks open Train, study blocks start Focus | map | M | issue |
-| S4 | Calendar events as replanner obstacles | #9 | L | issue |
-| S5 | Day 2: widget card + Live Activity on the first block | #6 | S | issue |
-| S6 | Tone pass: no red, review shows wins first | #3 | S | issue |
+| S1 | Voice capture in Ask | #2 | M | shipped #56 (tap to toggle) |
+| S2 | Quick add by text on Now ("gym 7pm 45m") | #2, #5 | S | shipped #56 |
+| S3 | Gym/run blocks open Train, study blocks start Focus | map | M | shipped #58 |
+| S4 | Calendar events as replanner obstacles | #9 | L | shipped #59 |
+| S5 | Day 2: widget card + Live Activity on the first block | #6 | S | shipped #57 |
+| S6 | Tone pass: no red, review shows wins first | #3 | S | shipped #57 |
 | S7 | Overrun learning: "this block usually takes longer" | #1 | M | later |
 | S8 | Trial end: what you keep, what you lose | — | S | later |
 
