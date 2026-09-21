@@ -24,6 +24,7 @@ struct DayView: View {
     @State private var showTomorrow = false
     @State private var showingDays = false
     @State private var openDay: Date?
+    @State private var widgetCardDismissed = UserDefaults.standard.bool(forKey: "widgetCardDismissed")
     private var persistence: PersistenceState { PersistenceState.shared }
 
     private let calendar = Calendar.current
@@ -60,6 +61,7 @@ struct DayView: View {
                     progress
                     if let error = persistence.lastError { persistenceBanner(error) }
                     if notificationsDenied && !bannerDismissed { permissionBanner }
+                    if showWidgetCard { widgetCard }
                     NowCard(
                         block: current,
                         allDone: doneCount == counted.count,
@@ -78,7 +80,7 @@ struct DayView: View {
                     section("Left today", count: leftToday.count, blocks: leftToday, empty: "Nothing left on the plan.")
                     if isEvening && !missed.isEmpty { review }
                     else if !missed.isEmpty {
-                        section("Missed", count: missed.count, blocks: missed, empty: nil, hint: "Hold a row to move it later or skip it today.")
+                        section("Needs a decision", count: missed.count, blocks: missed, empty: nil, hint: "Hold a row to move it later or skip it today.")
                     }
                     if !finished.isEmpty { section("Done", count: nil, blocks: finished, empty: nil) }
                     tomorrow
@@ -209,6 +211,35 @@ struct DayView: View {
         .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
     }
 
+    /// Day 1–3: the one thing that keeps Pacer in sight after the app is forgotten (USERS.md #6).
+    private var showWidgetCard: Bool {
+        guard !widgetCardDismissed, !plan.needsOnboarding else { return false }
+        let key = "firstLaunchDay"
+        if UserDefaults.standard.object(forKey: key) == nil { UserDefaults.standard.set(now, forKey: key) }
+        let first = UserDefaults.standard.object(forKey: key) as? Date ?? now
+        return (calendar.dateComponents([.day], from: first, to: now).day ?? 0) < 3
+    }
+
+    private var widgetCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "square.grid.2x2.fill").foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Keep what's now on your Home Screen").font(.headline)
+                Text("Long-press the Home Screen → + → Pacer. The widget shows what's now and what's next.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button {
+                widgetCardDismissed = true
+                UserDefaults.standard.set(true, forKey: "widgetCardDismissed")
+            } label: { Image(systemName: "xmark").font(.caption.weight(.bold)) }
+                .accessibilityLabel("Dismiss")
+        }
+        .padding()
+        .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 16))
+        .transition(.opacity)
+    }
+
     private var permissionBanner: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "bell.slash.fill").foregroundStyle(.orange)
@@ -259,8 +290,8 @@ struct DayView: View {
                 if let count {
                     Text("\(count)").font(.caption.weight(.semibold)).monospacedDigit()
                         .padding(.horizontal, 7).padding(.vertical, 2)
-                        .background(title == "Missed" ? Color.red.opacity(0.12) : Color(uiColor: .tertiarySystemFill), in: Capsule())
-                        .foregroundStyle(title == "Missed" ? .red : .secondary)
+                        .background(title == "Needs a decision" ? Color.orange.opacity(0.14) : Color(uiColor: .tertiarySystemFill), in: Capsule())
+                        .foregroundStyle(title == "Needs a decision" ? .orange : .secondary)
                         .contentTransition(.numericText())
                 }
                 if let hint {
@@ -321,11 +352,18 @@ struct DayView: View {
                 Text("Day review").font(.headline)
                 Text("\(missed.count)").font(.caption.weight(.semibold)).monospacedDigit()
                     .padding(.horizontal, 7).padding(.vertical, 2)
-                    .background(Color.red.opacity(0.12), in: Capsule()).foregroundStyle(.red)
+                    .background(Color.orange.opacity(0.14), in: Capsule()).foregroundStyle(.orange)
                 Spacer()
                 Text("\(doneCount) of \(counted.count) done").font(.caption).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 4)
+            if doneCount > 0 {
+                // What went right comes first; the slips below are decisions, not failures.
+                let done = blocks.filter { completed.contains($0.id) }.map(\.label)
+                Label("\(done.prefix(4).joined(separator: ", "))\(done.count > 4 ? " +\(done.count - 4)" : "")", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline).foregroundStyle(.green).lineLimit(2)
+                    .padding(.horizontal, 4)
+            }
             VStack(spacing: 0) {
                 ForEach(missed) { block in
                     HStack(spacing: 10) {

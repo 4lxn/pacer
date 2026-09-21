@@ -17,9 +17,9 @@ struct NowCard: View {
             PaceLine(behind: behind && !allDone)
             if let block {
                 let status = block.status(now: now, completed: completed, calendar: calendar)
-                Text(status == .missed ? "OVERDUE" : "NOW")
+                Text(status == .missed ? "SLIPPED" : "NOW")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(status == .missed ? .red : .accentColor)
+                    .foregroundStyle(status == .missed ? .orange : .accentColor)
                 Text(block.label)
                     .font(.largeTitle.weight(.bold))
                     .fixedSize(horizontal: false, vertical: true)
@@ -53,7 +53,7 @@ struct NowCard: View {
                     .padding(.vertical, 6)
                 }
                 .buttonStyle(.glassProminent)
-                .tint(closing ? .green : status == .missed ? .red : .accentColor)
+                .tint(closing ? .green : .accentColor)
                 .scaleEffect(closing ? 1.03 : 1)
                 .sensoryFeedback(.success, trigger: closing)
                 if status == .missed {
