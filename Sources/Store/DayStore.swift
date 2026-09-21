@@ -18,6 +18,8 @@ final class DayStore {
     var morningBrief = true { didSet { saveSettings() } }
     /// "Ends in 5 min" for blocks of 30 min or more.
     var endNudges = true { didSet { saveSettings() } }
+    /// Calendar events count as busy time (read-only, on device). Off by default.
+    var useCalendar = false { didSet { saveSettings() } }
     /// "pacer" (the bundled chime) or "system".
     var sound = "pacer" { didSet { saveSettings() } }
     /// Places and travel times between them (`places.json`).
@@ -33,6 +35,7 @@ final class DayStore {
         var liveActivity: Bool?
         var morningBrief: Bool?
         var endNudges: Bool?
+        var useCalendar: Bool?
     }
 
     private let overridesURL: URL
@@ -60,12 +63,13 @@ final class DayStore {
             liveActivity = s.liveActivity ?? true
             morningBrief = s.morningBrief ?? true
             endNudges = s.endNudges ?? true
+            useCalendar = s.useCalendar ?? false
         } else {
             dayEnd = fallbackDayEnd
         }
     }
 
-    private func saveSettings() { JSONFile.save(Settings(dayEnd: dayEnd, checkInsEnabled: checkInsEnabled, sound: sound, liveActivity: liveActivity, morningBrief: morningBrief, endNudges: endNudges), to: settingsURL) }
+    private func saveSettings() { JSONFile.save(Settings(dayEnd: dayEnd, checkInsEnabled: checkInsEnabled, sound: sound, liveActivity: liveActivity, morningBrief: morningBrief, endNudges: endNudges, useCalendar: useCalendar), to: settingsURL) }
 
     func override(dayKey: String) -> DayOverride { overrides[dayKey] ?? DayOverride() }
 

@@ -77,6 +77,7 @@ struct DayView: View {
                     .transition(.blurReplace)
                     askButton
                     upNext
+                    calendarRows
                     section("Left today", count: leftToday.count, blocks: leftToday, empty: "Nothing left on the plan.")
                     if isEvening && !missed.isEmpty { review }
                     else if !missed.isEmpty {
@@ -123,6 +124,7 @@ struct DayView: View {
                 now = .now
                 store.reload()
                 metrics.record(.appOpen)
+                if days.useCalendar { CalendarBusy.shared.refresh(now: now, calendar: calendar) }
                 Task {
                     await refreshNotifications()
                     await autoCompleteFromHealth()
@@ -283,6 +285,36 @@ struct DayView: View {
                 }
             }
             .font(.subheadline)
+        }
+    }
+
+    /// Calendar events still ahead today, as grey rows: busy time, not blocks (USERS.md #9).
+    @ViewBuilder
+    private var calendarRows: some View {
+        let events = days.useCalendar ? (CalendarBusy.shared.events[mutator.dayKey(now)] ?? []).filter { $0.end > now } : []
+        if !events.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Text("Calendar").font(.headline)
+                    Text("\(events.count)").font(.caption.weight(.semibold)).monospacedDigit()
+                        .padding(.horizontal, 7).padding(.vertical, 2)
+                        .background(Color(uiColor: .tertiarySystemFill), in: Capsule()).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 4)
+                VStack(spacing: 0) {
+                    ForEach(events) { e in
+                        HStack(spacing: 12) {
+                            Text("\(e.start.formatted(date: .omitted, time: .shortened))").font(.subheadline.monospacedDigit()).foregroundStyle(.secondary).frame(width: 64, alignment: .leading)
+                            Text(e.title).foregroundStyle(.secondary).lineLimit(1)
+                            Spacer()
+                            Image(systemName: "calendar").font(.caption).foregroundStyle(.tertiary)
+                        }
+                        .padding(.vertical, 8).padding(.horizontal, 12)
+                        if e.id != events.last?.id { Divider().padding(.leading, 88) }
+                    }
+                }
+                .background(Color(uiColor: .secondarySystemGroupedBackground).opacity(0.7), in: RoundedRectangle(cornerRadius: 16))
+            }
         }
     }
 

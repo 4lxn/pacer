@@ -32,6 +32,8 @@ enum Replanner {
         var skipped: Set<String>
         var calendar: Calendar = .current
         var places = Places()
+        /// Busy time from outside the plan (calendar events); never moved, never a block.
+        var busy: [Obstacle] = []
     }
 
     /// An obstacle on the day: fixed or in-progress block the moved one must not overlap, with
@@ -88,12 +90,13 @@ enum Replanner {
     /// progress right now. Other windows are pushable.
     static func obstacles(in ctx: Context, excluding id: String) -> [Obstacle] {
         let nowMin = DayLogic.minutesOfDay(ctx.now, calendar: ctx.calendar)
-        return ctx.plan.compactMap { b in
+        let fromPlan: [Obstacle] = ctx.plan.compactMap { b in
             guard b.id != id, let s = b.start, let e = b.end, !ctx.completed.contains(b.id), !ctx.skipped.contains(b.id) else { return nil }
             let sm = DayLogic.minutes(s), em = DayLogic.minutes(e)
             let isCurrentWindow = b.kind == .window && sm <= nowMin && nowMin <= em
             return b.kind == .fixed || isCurrentWindow ? Obstacle(start: sm, end: em, label: b.label, place: b.place) : nil
-        }.sorted { $0.start < $1.start }
+        }
+        return (fromPlan + ctx.busy).sorted { $0.start < $1.start }
     }
 
     /// Free intervals between obstacles, each shrunk by the travel needed from the obstacle

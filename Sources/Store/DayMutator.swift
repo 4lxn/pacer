@@ -245,7 +245,8 @@ final class DayMutator {
         return Replanner.Context(
             plan: effectivePlan(on: date), override: days.override(dayKey: key), now: clock(for: date), dayEnd: days.dayEnd,
             completed: completions.completed(dayKey: key), skipped: completions.skipped(dayKey: key), calendar: calendar,
-            places: days.places
+            places: days.places,
+            busy: days.useCalendar ? CalendarBusy.shared.obstacles(dayKey: key, calendar: calendar) : []
         )
     }
 

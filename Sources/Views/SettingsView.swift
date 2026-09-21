@@ -36,8 +36,14 @@ struct SettingsView: View {
                     NavigationLink { PlacesView(days: days) } label: {
                         LabeledContent("Places & travel", value: "\(days.places.list.count)")
                     }
+                    Toggle("Calendar events are busy time", isOn: Binding(get: { days.useCalendar }, set: { on in
+                        if on { Task { days.useCalendar = await CalendarBusy.shared.requestAccess(); CalendarBusy.shared.refresh() } } else { days.useCalendar = false }
+                    }))
+                    if CalendarBusy.shared.denied || (days.useCalendar && !CalendarBusy.shared.isAuthorized) {
+                        Button("Calendar access is off in iOS Settings") { open(URL(string: UIApplication.openSettingsURLString)) }.font(.footnote)
+                    }
                 } header: { Text("Day") } footer: {
-                    Text("A moved block is never placed after the day end. Check-ins ask “Did it happen?” five minutes after a block ends; you can also turn them off per block.")
+                    Text("A moved block is never placed after the day end or on top of a calendar event. Events are read on this phone and never sent anywhere. Check-ins ask “Did it happen?” five minutes after a block ends; you can also turn them off per block.")
                 }
 
                 Section("Your week") {
