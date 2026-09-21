@@ -5,9 +5,13 @@ struct BlockDetailSheet: View {
     let block: Block
     let now: Date
     @Bindable var mutator: DayMutator
+    /// Optional: a gym/run block shows this week's training; a study block can start a focus.
+    var health: HealthStore? = nil
+    var track: TrackStore? = nil
     let onEditPlan: (Block) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var note = ""
+    @State private var showTimer = false
     @State private var editingTime = false
     @State private var start = Date.now
     @State private var end = Date.now
@@ -70,6 +74,9 @@ struct BlockDetailSheet: View {
                     }
                 }
 
+                if let health, health.isAuthorized, block.autoComplete == .run || block.autoComplete == .strength { trainSection(health) }
+                if let track, block.autoComplete == .study, status != .done, status != .skipped { focusSection(track) }
+
                 Section(isToday ? "Note for today" : "Note for \(dayWord)") {
                     TextField("What to do in this block…", text: $note, axis: .vertical)
                         .lineLimit(1...4)
@@ -110,8 +117,47 @@ struct BlockDetailSheet: View {
                 end = block.endDate(on: now, calendar: calendar) ?? now
             }
             .sheet(isPresented: $editingTime) { timeSheet }
+            .fullScreenCover(isPresented: $showTimer) { if let track { FocusTimerView(track: track) } }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    /// The Train tab, reduced to what matters when this block is on: the week so far, the last
+    /// session of this kind, and readiness (USERS.md, APP-MAP "block types").
+    private func trainSection(_ health: HealthStore) -> some View {
+        let kind: WorkoutActivity = block.autoComplete == .run ? .run : .strength
+        let week = WeekBar.make(health.workouts, weeks: 1, now: now, calendar: calendar).last
+        let last = health.workouts.first { $0.activity == kind }
+        let readiness = Readiness.line(sleepMinutes: health.sleepLastNightMinutes, restingHR: health.restingHeartRate)
+        return Section("Train") {
+            if let week {
+                LabeledContent("This week", value: kind == .run ? String(format: "%.1f km · %d min", week.runKilometers, week.runMinutes) : "\(week.lifts) lifts · \(week.strengthMinutes) min")
+            }
+            if let last {
+                LabeledContent("Last \(kind == .run ? "run" : "session")", value: [last.start.formatted(.dateTime.weekday(.abbreviated).day()), "\(Int(last.duration / 60)) min", last.paceMinPerKm.map(WorkoutSummary.pace), last.avgHeartRate.map { "\(Int($0)) bpm" }].compactMap { $0 }.joined(separator: " · "))
+            } else {
+                Text("No \(kind == .run ? "runs" : "sessions") in Apple Health yet. This block closes itself when one lands.").font(.subheadline).foregroundStyle(.secondary)
+            }
+            Label(readiness.text, systemImage: readiness.good ? "bolt.heart.fill" : "tortoise.fill")
+                .font(.subheadline).foregroundStyle(readiness.good ? Color.green : Color.orange)
+        }
+    }
+
+    private func focusSection(_ track: TrackStore) -> some View {
+        Section("Focus") {
+            if track.isStudying {
+                Button("Open the timer", systemImage: "timer") { showTimer = true }
+            } else {
+                let minutes = min(max(block.durationMinutes ?? 25, 10), 90)
+                Button("Start focus · \(minutes) min", systemImage: "play.fill") {
+                    track.startStudy(topic: block.label, focusMinutes: minutes)
+                    if let until = track.runningUntil { Task { await NotificationScheduler.scheduleFocusEnd(at: until, topic: block.label) } }
+                    Task { await FocusActivityController.sync(track: track) }
+                    showTimer = true
+                }
+            }
+            Text("\(WorkoutMatch.studyMinutesToClose)+ min of focus today closes this block on its own.").font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     private var timeSheet: some View {
@@ -159,7 +205,7 @@ struct BlockDetailSheet: View {
         switch mark {
         case .done: .accentColor
         case .skipped: Color(uiColor: .tertiaryLabel)
-        case .missed: .red.opacity(0.7)
+        case .missed: .orange.opacity(0.8)
         case .off: Color(uiColor: .quaternarySystemFill)
         case .pending: Color(uiColor: .tertiarySystemFill)
         }
