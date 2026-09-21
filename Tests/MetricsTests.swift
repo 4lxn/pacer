@@ -33,9 +33,9 @@ final class MetricsTests: XCTestCase {
     func testCheckInsSwitchDropsCheckInsButKeepsMovedStarts() {
         let blocks = [Block(id: "b", label: "Gym", kind: .window, start: .hm(19, 0), end: .hm(20, 0))]
         let on = NotificationScheduler.buildCheckIns(plan: { _ in blocks }, now: date(16), completed: { _ in [] }, skipped: { _ in [] },
-                                                    movedIDs: { _ in ["b"] }, checkIns: true, brief: false, calendar: calendar)
+                                                    movedIDs: { _ in ["b"] }, checkIns: true, brief: false, endNudges: false, calendar: calendar)
         let off = NotificationScheduler.buildCheckIns(plan: { _ in blocks }, now: date(16), completed: { _ in [] }, skipped: { _ in [] },
-                                                     movedIDs: { _ in ["b"] }, checkIns: false, brief: false, calendar: calendar)
+                                                     movedIDs: { _ in ["b"] }, checkIns: false, brief: false, endNudges: false, calendar: calendar)
         XCTAssertEqual(on.map(\.identifier), ["moved-b-2026-09-16", "checkin-b-2026-09-16", "moved-b-2026-09-17", "checkin-b-2026-09-17"])
         XCTAssertEqual(off.map(\.identifier), ["moved-b-2026-09-16", "moved-b-2026-09-17"])
     }

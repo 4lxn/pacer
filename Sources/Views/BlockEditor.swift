@@ -48,7 +48,8 @@ struct BlockEditor: View {
                     }
                 }
                 Section {
-                    if block.kind != .free && !block.isAnchor {
+                    Toggle("Notifications for this block", isOn: Binding(get: { !block.quiet }, set: { block.quiet = !$0 }))
+                    if block.kind != .free && !block.isAnchor && !block.quiet {
                         Toggle("Check-in 5 min after it ends", isOn: $block.checkIn)
                     }
                     Toggle("Anchor (never droppable, breaks through Focus)", isOn: $block.isAnchor)

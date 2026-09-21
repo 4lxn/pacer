@@ -152,3 +152,11 @@ see their pace on their own. That is exactly what gate 1 measures.
 
 **Recommendation:** six weeks, not six months. Rebuild to the three surfaces, get thirty
 real users, measure the gates. Pass → apply with numbers. Miss → next project.
+
+## Status (2026-09-21, build 22)
+
+Shipped the same day as this document: Now · Pace · Ask (#44), onboarding with goal chips and
+templates (#45), anonymous usage counts + privacy promises (#46), "ends in 5 min" nudges and the
+per-block quiet switch (#47). Research behind the order: `USERS.md`; surface-by-surface gaps:
+`APP-MAP.md`. Next: voice capture in Ask, block types opening Train/Focus from a block, calendar
+events as replanner obstacles, then the 30-tester TestFlight post.
