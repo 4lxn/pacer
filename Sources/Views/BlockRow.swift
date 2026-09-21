@@ -27,7 +27,7 @@ struct BlockRow: View {
                 .accessibilityLabel(status == .done ? "Mark not done" : "Mark done")
                 Text(timeText)
                     .font(.subheadline.monospacedDigit().weight(status == .missed ? .semibold : .regular))
-                    .foregroundStyle(status == .missed ? .red : .secondary)
+                    .foregroundStyle(status == .missed ? .orange : .secondary)
                     .frame(width: 48, alignment: .leading)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
@@ -82,8 +82,8 @@ struct BlockRow: View {
             .font(.caption2.weight(.medium))
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(status == .missed ? Color.red.opacity(0.12) : Color(uiColor: .tertiarySystemFill), in: Capsule())
-            .foregroundStyle(status == .missed ? .red : .secondary)
+            .background(status == .missed ? Color.orange.opacity(0.14) : Color(uiColor: .tertiarySystemFill), in: Capsule())
+            .foregroundStyle(status == .missed ? .orange : .secondary)
             .contentTransition(.interpolate)
     }
 
