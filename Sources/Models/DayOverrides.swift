@@ -65,6 +65,25 @@ extension DayLogic {
     }
 
     /// Consecutive days (ending today or yesterday) with a score ≥ `threshold`; today counts once it qualifies.
+    /// A day is "on pace" at this share of its blocks done. Skipped blocks don't count against it.
+    static let paceThreshold = 0.8
+
+    /// Days on pace in a row ending today (today counts only once it is on pace), with one
+    /// forgiven miss per 7 days. Days with nothing planned are skipped, not broken.
+    static func paceStreak(now: Date, calendar: Calendar = .current, score: (Date) -> Double?) -> Int {
+        var streak = 0, day = now, lastMiss: Date?
+        if let s = score(now), s >= paceThreshold { streak += 1 }
+        for _ in 0..<365 {
+            guard let previous = calendar.date(byAdding: .day, value: -1, to: day) else { break }
+            day = previous
+            guard let s = score(day) else { continue }
+            if s >= paceThreshold { streak += 1; continue }
+            if let lastMiss, (calendar.dateComponents([.day], from: day, to: lastMiss).day ?? 0) < 7 { break }
+            lastMiss = day
+        }
+        return streak
+    }
+
     static func dayStreak(now: Date, threshold: Double = 0.8, calendar: Calendar = .current, score: (Date) -> Double?) -> Int {
         var streak = 0
         var day = now

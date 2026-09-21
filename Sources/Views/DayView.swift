@@ -11,6 +11,7 @@ struct DayView: View {
     @Bindable var track: TrackStore
     @Bindable var account: CoachAccount
     @Bindable var sections: SectionStore
+    var onAsk: () -> Void = {}
     @Environment(\.scenePhase) private var scenePhase
     @State private var now = Date.now
     @State private var notificationsDenied = false
@@ -44,11 +45,7 @@ struct DayView: View {
     private var missed: [Block] { blocks.filter { status($0) == .missed } }
     private var finished: [Block] { blocks.filter { completed.contains($0.id) || skipped.contains($0.id) } }
     private var current: Block? { DayLogic.currentBlock(blocks, now: now, completed: completed, skipped: skipped, calendar: calendar) }
-    private func score(_ day: Date) -> Double? {
-        let key = mutator.dayKey(day)
-        return DayLogic.dayScore(mutator.effectivePlan(on: day), completed: store.completed(dayKey: key), skipped: store.skipped(dayKey: key))
-    }
-    private var streak: Int { DayLogic.dayStreak(now: now, calendar: calendar, score: score) }
+    private var streak: Int { DayLogic.paceStreak(now: now, calendar: calendar) { mutator.score(on: $0) } }
     /// The day is winding down: every timed block has ended, or it's the last hour before day end.
     private var isEvening: Bool {
         let lastEnd = blocks.compactMap { $0.endDate(on: now, calendar: calendar) }.max()
@@ -61,12 +58,12 @@ struct DayView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     progress
-                    historyStrip
                     if let error = persistence.lastError { persistenceBanner(error) }
                     if notificationsDenied && !bannerDismissed { permissionBanner }
                     NowCard(
                         block: current,
                         allDone: doneCount == counted.count,
+                        behind: !missed.isEmpty,
                         now: now,
                         completed: completed,
                         calendar: calendar,
@@ -76,6 +73,7 @@ struct DayView: View {
                     )
                     .id(current?.id ?? "none")
                     .transition(.blurReplace)
+                    askButton
                     upNext
                     section("Left today", count: leftToday.count, blocks: leftToday, empty: "Nothing left on the plan.")
                     if isEvening && !missed.isEmpty { review }
@@ -92,7 +90,7 @@ struct DayView: View {
                 .animation(.snappy(duration: 0.4), value: moved)
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Today")
+            .navigationTitle("Now")
             .navigationSubtitle(now.formatted(.dateTime.weekday(.wide).day().month(.wide)))
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
@@ -163,6 +161,10 @@ struct DayView: View {
                     .monospacedDigit()
                     .contentTransition(.numericText())
                 Spacer()
+                if streak > 0 {
+                    Label("\(streak)", systemImage: "flame.fill").font(.subheadline.weight(.medium)).foregroundStyle(.orange)
+                        .contentTransition(.numericText()).accessibilityLabel("\(streak)-day streak")
+                }
                 if counted.count > 0 {
                     Text("\(Int((Double(doneCount) / Double(counted.count) * 100).rounded()))%")
                         .font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
@@ -170,9 +172,24 @@ struct DayView: View {
                 }
             }
             ProgressView(value: Double(doneCount), total: Double(max(counted.count, 1)))
-                .tint(.accentColor)
+                .tint(doneCount == counted.count && counted.count > 0 ? .green : .accentColor)
         }
         .animation(.snappy, value: doneCount)
+    }
+
+    /// Ask Pacer: the assistant, one tap from the day. It knows the plan and can change it.
+    private var askButton: some View {
+        Button(action: onAsk) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                Text(missed.isEmpty ? "Ask Pacer" : "Ask Pacer to fix my day")
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+        }
+        .buttonStyle(.glass)
+        .tint(.purple)
     }
 
     private func persistenceBanner(_ message: String) -> some View {
@@ -293,42 +310,6 @@ struct DayView: View {
 
     /// Check-ins are one-shot (today + tomorrow); re-arm after anything that changes what's done.
     private func rearmCheckIns() async { mutator.now = { .now }; await mutator.rearm() }
-
-    /// Two weeks of day scores, oldest first; today last. Taller = more of the plan done.
-    private var historyStrip: some View {
-        let days: [(key: String, score: Double?)] = (0..<14).reversed().compactMap { offset in
-            guard let day = calendar.date(byAdding: .day, value: -offset, to: now) else { return nil }
-            let key = mutator.dayKey(day)
-            return (key, DayLogic.dayScore(mutator.effectivePlan(on: day), completed: store.completed(dayKey: key), skipped: store.skipped(dayKey: key)))
-        }
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Text("Last 14 days").font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                if streak > 0 {
-                    Label("\(streak)-day streak", systemImage: "flame.fill").font(.caption.weight(.medium)).foregroundStyle(.orange)
-                        .contentTransition(.numericText())
-                }
-            }
-            HStack(alignment: .bottom, spacing: 4) {
-                ForEach(days, id: \.key) { day in
-                    let score = day.score ?? 0
-                    let isToday = day.key == mutator.dayKey(now)
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color(uiColor: .tertiarySystemFill))
-                        .overlay(alignment: .bottom) {
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(isToday ? Color.accentColor : Color.accentColor.opacity(0.55))
-                                .frame(height: max(score > 0 ? 3 : 0, 24 * score))
-                        }
-                        .frame(height: 24)
-                        .frame(maxWidth: .infinity)
-                        .accessibilityLabel("\(day.key): \(Int(score * 100)) percent")
-                }
-            }
-            .animation(.snappy, value: doneCount)
-        }
-    }
 
     /// End of day: what slipped, one decision per row. Blocks that aren't daily can move to tomorrow.
     private var review: some View {

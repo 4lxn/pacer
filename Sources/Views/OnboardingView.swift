@@ -143,7 +143,7 @@ struct OnboardingView: View {
 
     private var coachIntroStep: some View {
         VStack(alignment: .leading, spacing: 20) {
-            title("Meet your coach", "Five short questions so it knows your goals, your training and how you eat. It can then plan meals, move blocks and answer with your numbers. You can change all of it later.")
+            title("Tell Pacer about you", "Five short questions so it knows your goals, your training and how you eat. Then it can move blocks, plan meals and answer with your numbers. Change any of it later.")
             primary("Let's go") { advance(); answerFocused = true }
             secondary("Skip for now") { finish() }
         }
@@ -171,7 +171,7 @@ struct OnboardingView: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 56)).foregroundStyle(Color.accentColor)
                 .symbolEffect(.bounce, value: step)
-            title("You're set", "Your day is planned, your coach knows you. Today is one tap away.")
+            title("You're set", "Your day is planned and Pacer knows you. Now is one tap away.")
             primary("Open today") { finish() }
         }
     }

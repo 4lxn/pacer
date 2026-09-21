@@ -70,8 +70,8 @@ struct SettingsView: View {
                     Text("Runs and strength workouts in Health close their blocks, even while the app is closed.")
                 }
 
-                Section("Coach") {
-                    Button("Coach profile", systemImage: "person.text.rectangle") { editingProfile = true }
+                Section("Ask Pacer") {
+                    Button("About you", systemImage: "person.text.rectangle") { editingProfile = true }
                     if account.isSignedIn {
                         Button("Sign out", systemImage: "rectangle.portrait.and.arrow.right") { account.signOut() }
                     }
