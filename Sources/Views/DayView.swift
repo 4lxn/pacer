@@ -105,7 +105,7 @@ struct DayView: View {
             .navigationDestination(isPresented: $showingDays) { DaysView(mutator: mutator, plan: plan, now: now) }
             .navigationDestination(item: $openDay) { day in DayPlanView(mutator: mutator, plan: plan, date: day, now: now) }
             .sheet(item: $detail) { block in
-                BlockDetailSheet(block: block, now: now, mutator: mutator) { editingBlock = $0 }
+                BlockDetailSheet(block: block, now: now, mutator: mutator, health: health, track: track) { editingBlock = $0 }
             }
             .sheet(item: $editingBlock) { block in
                 BlockEditor(block: plan.block(id: block.id) ?? block, isNew: false, places: mutator.days.places.list) { plan.upsert($0) } onDelete: { plan.delete(id: $0) }
@@ -135,8 +135,11 @@ struct DayView: View {
         .sheet(isPresented: $editingPlan) { PlanView(plan: plan, places: days.places.list) }
         .onAppear {
             #if DEBUG
+            if CoachAccount.screenshotMode != nil { health.seedForScreenshots(now: now, calendar: calendar) }
             if ["settings", "places", "placeform"].contains(CoachAccount.screenshotMode ?? "") { showingSettings = true }
             if CoachAccount.screenshotMode == "detail" { detail = current ?? blocks.first }
+            if CoachAccount.screenshotMode == "detail-gym" { detail = blocks.first { $0.autoComplete == .strength } }
+            if CoachAccount.screenshotMode == "detail-study" { detail = blocks.first { $0.autoComplete == .study } }
             if CoachAccount.screenshotMode == "days" { showingDays = true }
             if CoachAccount.screenshotMode == "tomorrow" { openDay = calendar.date(byAdding: .day, value: 1, to: now) }
             #endif
@@ -461,6 +464,9 @@ struct DayView: View {
 
     /// A run or strength workout in Apple Health today, or 20+ min of study, closes the matching blocks.
     private func autoCompleteFromHealth() async {
+        #if DEBUG
+        if CoachAccount.screenshotMode != nil { health.seedForScreenshots(now: now, calendar: calendar); return }
+        #endif
         if health.isAvailable { await health.refresh(now: now, calendar: calendar) }
         mutator.autoClose(workouts: health.workouts, studyMinutesToday: track.studyMinutes(on: now), on: now)
     }
