@@ -1,109 +1,88 @@
-# Pacer
+<p align="center">
+  <img src="docs/screenshots/home-icon.png" width="88" alt="Pacer icon">
+</p>
 
-**Pacer keeps your day on pace.** An iOS planner of daily blocks that notifies you when each fixed
-block starts, asks "did it happen?" five minutes after a longer block ends (Done / Move it later /
-Skip today from the lock screen), moves a missed block into free time later today with one tap
-(undoable), closes training blocks from Apple Health even while closed, shows Now/Next on the home
-screen, and bundles the trackers around your day: training week and weight, meals and pantry, study
-timer, income, closet with laundry and outfits, and an AI Coach that knows your plan and can change
-it. Swift 6, SwiftUI, iOS 26+ (Liquid Glass), no third-party dependencies.
+<h1 align="center">Pacer</h1>
 
-Sections you toggle and order (Settings → Sections): **Today** (plan, calendar, places, settings) ·
-**Train** (Apple Health, goals, readiness, bests) · **Food** (macros, water, recipes, groceries) ·
-**Focus** (timer in the Dynamic Island, subjects, heat map) · **Money** (income, expenses, budgets)
-· **Closet** (scan, outfit from the weather, laundry) · **Coach** (streaming agent that can change
-anything). Widgets on Home and Lock Screen, Live Activities, Siri shortcuts, morning brief.
+<p align="center"><b>Runs your day so you don't have to.</b><br>
+It tells you what's now, asks whether it happened, and moves what didn't — travel time included, no guilt.</p>
 
-The product was named Autopiloto during development; the bundle id (`com.alan.autopiloto`), scheme,
-targets and repo keep that name. Everything the user sees says Pacer. How it fits together:
-`docs/ARCHITECTURE.md`.
+<p align="center">
+  <img src="https://img.shields.io/badge/iOS-26-black" alt="iOS 26">
+  <img src="https://img.shields.io/badge/Swift-6-F05138" alt="Swift 6">
+  <img src="https://img.shields.io/badge/tests-131-2ea44f" alt="131 tests">
+  <img src="https://img.shields.io/badge/TestFlight-build%2023-0a84ff" alt="TestFlight build 23">
+  <img src="https://img.shields.io/badge/data-stays%20on%20your%20phone-6f42c1" alt="local-first">
+</p>
 
-The only network code lives in `Sources/Coach/` (Claude Messages API, directly with the user's key
-or through `server/`). Everything else works with no network, ever. Docs: `docs/privacy.md`,
-`docs/app-store.md`, `docs/release.md`, `server/README.md`.
+Pacer is an iOS app for people whose routine collapses by 2 pm — ADHD and "ADHD-ish" adults who have tried every planner. Planners ask you to open them and plan. Pacer works at the moment the plan breaks: a notification on the lock screen asks **"did it happen?"**, one tap answers, and the day repairs itself.
 
-## Requirements
+## The loop
 
-- Xcode 26 (Swift 6). If `xcode-select -p` points at CommandLineTools, either run
-  `sudo xcode-select -s /Applications/Xcode-26.6.0.app` once or prefix every command below with
-  `DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer`.
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
+1. **Now** — one card: what's now, minutes left, one big button. A pace line stays green while the day is on pace and turns amber when something slipped.
+2. **Did it happen?** — when a block ends, a notification with *Done · Move it later · Skip today*. No need to open the app.
+3. **Move it later** — a replanner finds the first gap that still fits, pushes what's behind it, respects travel time between your places and your calendar's meetings. One tap undoes it.
+4. **Closes itself** — a run or gym session on your watch (via Apple Health) marks the block done without a tap. A study block closes after 20 minutes of focus.
+5. **Pace** — days on pace accumulate into a streak with one free miss a week, a five-week grid, and what closed itself. Rewards are certain, never a slot machine.
 
-## Generate, build, test
+## Screens
 
-```sh
-xcodegen generate
-open Autopiloto.xcodeproj                      # pick your Team under Signing & Capabilities once
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/now.png" width="190" alt="Now"><br><sub>Now</sub></td>
+    <td align="center"><img src="docs/screenshots/pace.png" width="190" alt="Pace"><br><sub>Pace</sub></td>
+    <td align="center"><img src="docs/screenshots/onboarding-notifications.png" width="190" alt="Onboarding"><br><sub>Onboarding: one question per block</sub></td>
+    <td align="center"><img src="docs/screenshots/detail-gym.png" width="190" alt="Gym block"><br><sub>A gym block, with Train inside</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/dynamic-island.png" width="190" alt="Dynamic Island"><br><sub>Live Activity in the Dynamic Island</sub></td>
+    <td align="center"><img src="docs/screenshots/widgets-1.png" width="190" alt="Widgets"><br><sub>Home and Lock Screen widgets</sub></td>
+    <td align="center"><img src="docs/screenshots/onboarding-done.png" width="190" alt="Day running"><br><sub>Onboarding ends on a running day</sub></td>
+    <td align="center"><img src="docs/screenshots/focus-timer.png" width="190" alt="Focus timer"><br><sub>Focus timer</sub></td>
+  </tr>
+</table>
 
-xcodebuild -scheme Autopiloto -destination 'generic/platform=iOS Simulator' build
-xcodebuild -scheme Autopiloto -destination 'platform=iOS Simulator,name=iPhone 17' test
-```
+## What's inside
 
-Run on the simulator from Xcode (⌘R), or on a connected iPhone:
+- **Notifications that act**: repeating block starts, end-of-block check-ins with actions, leave-by reminders from Apple Maps ETAs, "ends in 5 min" nudges for long blocks, a morning brief, a custom chime, per-block quiet switch, and a 64-request budget managed soonest-first.
+- **Replanner**: pure, tested; first fitting gap after now, cascading pushes, shrink when nothing fits, travel-aware obstacles, calendar events as busy time, undo.
+- **Ask**: Pacer's assistant, a sheet from anywhere. Speak or type ("gym tomorrow at 7 at Smart Fit"); it acts through 54 typed tools against the same undoable write path as the UI. Streams its answers. Own Anthropic key or a subscription.
+- **Quick add**: "gym 7pm 45m" becomes a block; no pickers unless you want them.
+- **Integrations that remove questions**: Apple Health (workouts, weight, steps, sleep, resting HR, background delivery), MapKit (place search, ETAs by departure time), EventKit (read-only), WeatherKit, ActivityKit (two Live Activities), WidgetKit (three kinds, seven families), App Intents (seven Siri/Shortcuts actions), on-device Speech.
+- **Optional sections** for people who want them: Train, Food, Focus, Money, Closet — toggles, not tabs by default.
+- **Onboarding without typing**: goal chips become plan templates, profile chips become the assistant's context, the last screen is today already running.
 
-```sh
-xcodebuild -scheme Autopiloto -destination 'platform=iOS,name=<your iPhone name>' build
-```
+## Privacy, as promises
 
-`Autopiloto.xcodeproj` is generated and git-ignored; edit `project.yml` instead.
+1. Your data lives on your phone. Export it any time; delete the app and it's gone.
+2. Ask sends only what a question needs, and nothing is kept.
+3. No account unless you pay (Sign in with Apple, no email).
+4. We count, we don't read: a random id and a few integers a day, one switch to turn off.
 
-## Apple Health (Train tab)
+Full text: [`docs/privacy.md`](docs/privacy.md). The only network code is in `Sources/Coach/` and the 320-line proxy in [`server/`](server/).
 
-Pacer reads workouts, weight and steps from Apple Health and marks the Run / Gym blocks done
-when a matching workout lands today. Feed Health from your watch apps once:
+## Built with
 
-- Garmin Connect: More → Settings → Connected Apps → Apple Health → enable workouts, weight, steps.
-- Strava: Settings → Applications, Services and Devices → Health → connect.
+Swift 6 with strict concurrency (warnings as errors) · SwiftUI · iOS 26 Liquid Glass · Observation · Swift Charts · XcodeGen · no third-party dependencies in the app. Backend: Node on Railway — Apple identity-token verification (JWKS), HS256 sessions, per-user daily limits, streaming passthrough, anonymous cohort analytics on a volume.
 
-No Garmin or Strava API keys, no server. The weight you log in the Train tab is written to Health.
-Debug builds have an "Add test run" button to exercise the pipeline in the simulator.
+Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Build, test and simulator checks: [`docs/DEVELOPING.md`](docs/DEVELOPING.md).
 
-## Changing the plan
+## Numbers (measured 2026-09-21)
 
-Today → the sliders button opens the Plan editor (add, edit, delete blocks; weekdays; anchor;
-auto-complete). `Sources/Models/Plan.swift` only holds the seeds: the original day for installs
-that predate the editor, and `Plan.starter(wake:sleep:)` for onboarding.
+12,524 lines of app Swift · 131 XCTest methods in 23 files · 5 server tests · 72 commits · 51 merged PRs · 23 TestFlight builds · six days from empty repo to build 23.
 
-## Coach (optional)
+## Product work
 
-Coach tab → either subscribe (Sign in with Apple, needs `server/` deployed and
-`CoachClient.proxyURL` set) or Menu → "Use my own API key" and paste an Anthropic key (Keychain,
-never in this repo). The system prompt is the editable **Coach profile** (Menu → Coach profile)
-plus a snapshot of today's blocks, training, food, study and closet.
+- [`docs/PRODUCT.md`](docs/PRODUCT.md) — who it's for, the three-surface shape, fail-fast gates, a YC-lens scorecard.
+- [`docs/USERS.md`](docs/USERS.md) — ten needs ranked from community research, each mapped to a gap.
+- [`docs/APP-MAP.md`](docs/APP-MAP.md) — every surface, entry point and gap.
+- [`docs/STORIES.md`](docs/STORIES.md) — user stories with acceptance criteria; issues [#48–#55](../../issues).
+- [`docs/RESUME.md`](docs/RESUME.md) — the one-page summary.
 
-## Verify no network code outside Coach
+## Status
 
-```sh
-grep -ri "urlsession\|http" Sources/ --exclude-dir=Coach   # must print nothing
-```
+On TestFlight (build 23). Next gate: 30 external testers within four weeks; D7 ≥ 25 %, D30 ≥ 20 %, DAU/MAU ≥ 20 %. Open work: overrun learning (#54), trial-end copy (#55), CI, Live Activity push updates.
 
-## Manual checks in the simulator
+## Author
 
-```sh
-export DEVELOPER_DIR=/Applications/Xcode-26.6.0.app/Contents/Developer
-SIM=$(xcrun simctl list devices booted | grep -o '[0-9A-F-]\{36\}' | head -1)
-
-# Fire a start notification now (after tapping Allow once). Long-press it → Done marks b13 complete
-# without opening the app; relaunch and the row is checked.
-cat > /tmp/block.apns <<'JSON'
-{
-  "Simulator Target Bundle": "com.alan.autopiloto",
-  "aps": { "alert": { "title": "Leave for training", "body": "17:45 – 17:55" }, "category": "BLOCK_ACTIONS", "sound": "default" },
-  "blockId": "b13"
-}
-JSON
-xcrun simctl push "$SIM" com.alan.autopiloto /tmp/block.apns
-
-# Fire a check-in: long-press → Done or Skip today; both land on the dayKey, not on "now".
-cat > /tmp/checkin.apns <<'JSON'
-{
-  "Simulator Target Bundle": "com.alan.autopiloto",
-  "aps": { "alert": { "title": "Lunch ended", "body": "Did it happen?" }, "category": "CHECK_IN", "sound": "default" },
-  "blockId": "b09", "dayKey": "2026-09-16"
-}
-JSON
-xcrun simctl push "$SIM" com.alan.autopiloto /tmp/checkin.apns
-
-# Denial path: reset the permission and tap Don't Allow on the next launch.
-xcrun simctl privacy "$SIM" reset all com.alan.autopiloto
-```
+Alan Cervantes — product, engineering, release. Built with [Claude Code](https://claude.com/claude-code) under his direction: every scope and architecture decision, device review and App Store step is his; the code was written with the agent. The product was called Autopiloto during development, which is why the bundle id and Xcode targets still say so.
