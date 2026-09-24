@@ -83,6 +83,10 @@ Architecture: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Build, test and si
 
 On TestFlight (build 23). Next gate: 30 external testers within four weeks; D7 ≥ 25 %, D30 ≥ 20 %, DAU/MAU ≥ 20 %. Open work: overrun learning (#54), trial-end copy (#55), CI, Live Activity push updates.
 
+## License
+
+Source-available, all rights reserved: read and evaluate freely; using, copying or shipping it needs written permission. See [`LICENSE`](LICENSE).
+
 ## Author
 
 Alan Cervantes — product, engineering, release. Built with [Claude Code](https://claude.com/claude-code) under his direction: every scope and architecture decision, device review and App Store step is his; the code was written with the agent. The product was called Autopiloto during development, which is why the bundle id and Xcode targets still say so.
